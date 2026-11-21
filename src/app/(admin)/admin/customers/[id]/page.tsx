@@ -21,6 +21,11 @@ export default async function Customer360HubPage(
         *,
         cars(title, price, body_type),
         protection_films(title, price)
+      ),
+      installments(
+        *,
+        car:cars(title),
+        installment_payments(*)
       )
     `
     )

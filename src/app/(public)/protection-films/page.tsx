@@ -31,14 +31,14 @@ export default async function ProtectionFilmsPage() {
           </p>
           <div className="flex flex-wrap gap-4 pt-2">
             <a
-              href="tel:+201000000000"
+              href="tel:+201007946824"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white text-slate-900 font-bold text-sm hover:bg-slate-100 transition-all"
             >
               <Phone className="w-4 h-4 text-amber-600" />
               اتصل الآن للاستشارة
             </a>
             <a
-              href="https://wa.me/201000000000"
+              href="https://wa.me/201007946824"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-all"
@@ -87,7 +87,7 @@ export default async function ProtectionFilmsPage() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <a
-              href="https://wa.me/201000000000"
+              href="https://wa.me/201007946824"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm transition-all shadow-md"
@@ -96,7 +96,7 @@ export default async function ProtectionFilmsPage() {
               استشارة مجانية عبر الواتساب
             </a>
             <a
-              href="tel:+201000000000"
+              href="tel:+201007946824"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-[#c5a059] hover:bg-[#b08820] text-slate-950 font-black text-sm transition-all"
             >
               <Phone className="w-5 h-5" />

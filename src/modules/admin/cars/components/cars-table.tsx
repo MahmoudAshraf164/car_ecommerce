@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { CarWithRelations, BrandRow } from "../types/car.types";
 import { softDeleteCar, toggleFeatured } from "../actions/cars";
 import { SeedDataButton } from "./seed-data-button";
+import { AdminPagination } from "@/modules/admin/components/AdminPagination";
 import {
   Search, Plus, Star, Edit, Trash2, Eye, Filter,
   ChevronLeft, ChevronRight, Car as CarIcon, AlertTriangle
@@ -17,11 +18,12 @@ interface CarsTableProps {
   brands: BrandRow[];
   total: number;
   page: number;
+  pageSize?: number;
   totalPages: number;
-  currentFilters: { search?: string; brand_id?: string; status?: string; };
+  currentFilters: { search?: string; brand_id?: string; status?: string; limit?: string; };
 }
 
-export function CarsTable({ cars, brands, total, page, totalPages, currentFilters }: CarsTableProps) {
+export function CarsTable({ cars, brands, total, page, pageSize = 10, totalPages, currentFilters }: CarsTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(currentFilters.search || "");
@@ -32,7 +34,13 @@ export function CarsTable({ cars, brands, total, page, totalPages, currentFilter
 
   const applyFilters = (newParams: Record<string, string>) => {
     const params = new URLSearchParams();
-    const updated = { search, brand_id: selectedBrand, status: selectedStatus, ...newParams };
+    const updated = {
+      search,
+      brand_id: selectedBrand,
+      status: selectedStatus,
+      limit: currentFilters.limit || String(pageSize),
+      ...newParams,
+    };
     Object.entries(updated).forEach(([k, v]) => { if (v) params.set(k, v); });
     startTransition(() => router.push(`/admin/cars?${params.toString()}`));
   };
@@ -241,30 +249,17 @@ export function CarsTable({ cars, brands, total, page, totalPages, currentFilter
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3.5 bg-[#F8F9FA] border-t border-[#E5E7EB] text-xs text-[#46464b]">
-            <div>
-              صفحة <span className="font-bold text-[#121316]">{page}</span> من{" "}
-              <span className="font-bold text-[#121316]">{totalPages}</span>
-            </div>
-            <div className="flex gap-1.5">
-              <button
-                disabled={page <= 1 || isPending}
-                onClick={() => applyFilters({ page: String(page - 1) })}
-                className="p-2 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F3F4F5] disabled:opacity-40 text-[#121316] transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                disabled={page >= totalPages || isPending}
-                onClick={() => applyFilters({ page: String(page + 1) })}
-                className="p-2 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F3F4F5] disabled:opacity-40 text-[#121316] transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        <AdminPagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={(p) => applyFilters({ page: String(p) })}
+          onPageSizeChange={(newSize) => applyFilters({ limit: String(newSize), page: "1" })}
+          itemName="سيارة"
+          className="border-t border-t-[#E5E7EB] rounded-t-none"
+        />
       </div>
 
       {/* Delete Modal */}

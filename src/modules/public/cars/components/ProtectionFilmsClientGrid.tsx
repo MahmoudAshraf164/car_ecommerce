@@ -25,8 +25,14 @@ export function ProtectionFilmsClientGrid({ films }: ProtectionFilmsClientGridPr
       ? films
       : films.filter((f) => f.film_type === activeFilter);
 
-  const whatsappUrl = (title: string) =>
-    `https://wa.me/201000000000?text=${encodeURIComponent(`مرحباً، أرغب في الاستفسار عن: ${title}`)}`;
+  const buildWhatsappUrl = (film: ProtectionFilmWithImages) => {
+    const priceVal = (film as any).price || film.price_starting_from;
+    const priceFormatted = priceVal ? Number(priceVal).toLocaleString("en-US") : "—";
+    const warrantyText = film.warranty_years ? `${film.warranty_years} سنوات` : "ضمان معتمد";
+    const filmTypeArabic = film.film_type === "ppf" ? "PPF أفلام حماية" : film.film_type === "ceramic" ? "نانو سيراميك" : film.film_type === "tinting" ? "عزل حراري وتفييم" : film.film_type === "package" ? "باقة شاملة" : (film.film_type || "أفلام حماية");
+    const msg = `مرحباً معرض ولاد العم، أرغب في حجز والاستفسار عن باقة: ${film.title} (${filmTypeArabic}) - الضمان: ${warrantyText} - السعر: ${priceFormatted} ج.م`;
+    return `https://wa.me/201007946824?text=${encodeURIComponent(msg)}`;
+  };
 
   if (films.length === 0) {
     return (
@@ -153,26 +159,21 @@ export function ProtectionFilmsClientGrid({ films }: ProtectionFilmsClientGridPr
                         <span className="text-[10px] text-slate-400 block font-semibold">السعر يبدأ من</span>
                         <span className="text-xl font-black text-amber-600 font-mono">
                           {((film as any).price || film.price_starting_from)
-                            ? ((film as any).price || film.price_starting_from).toLocaleString("ar-EG")
+                            ? Number((film as any).price || film.price_starting_from).toLocaleString("en-US")
                             : "—"}
                         </span>
                         <span className="text-xs font-bold text-slate-500 mr-1">ج.م</span>
                       </div>
                       <div className="flex gap-2">
                         <a
-                          href={whatsappUrl(film.title)}
+                          href={buildWhatsappUrl(film)}
                           target="_blank"
-                          rel="noreferrer"
-                          className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-600 hover:text-white transition-all"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-l from-[#c5a059] to-[#e8c97a] hover:from-[#b08820] hover:to-[#d4af37] text-[#121316] font-black text-xs transition-all shadow-sm flex items-center gap-1.5"
                         >
                           <MessageSquare className="w-4 h-4" />
+                          <span>التفاصيل والحجز</span>
                         </a>
-                        <Link
-                          href={`/protection-films/${film.slug || film.id}`}
-                          className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition-all shadow-sm"
-                        >
-                          التفاصيل والحجز
-                        </Link>
                       </div>
                     </div>
                   </div>

@@ -2,27 +2,20 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { createBrowserClient } from "@supabase/ssr";
 import { carFormSchema, CarFormValues } from "../validations/car.schema";
-import { CarWithRelations, FeatureRow } from "../types/car.types";
-import { createCar, updateCar, getBrands, getModelsByBrand, seedCarsData } from "../actions/cars";
+import { CarWithRelations, FeatureRow, CarImageRow } from "../types/car.types";
+import { createCar, getBrands, getModelsByBrand, seedCarsData } from "../actions/cars";
 import { CarBrandModelSelect } from "./CarBrandModelSelect";
-import { CarImageUploader } from "./CarImageUploader";
+import { CarImageUploader, NewFileItem } from "./CarImageUploader";
 import { 
   Car, 
-  Plus, 
-  Trash2, 
-  Star, 
   CheckCircle2, 
-  Layers, 
   ListChecks, 
-  Image as ImageIcon,
   Loader2,
-  Sparkles,
-  AlertCircle,
-  X
+  AlertCircle
 } from "lucide-react";
 
 interface CarFormProps {
@@ -41,6 +34,27 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // ─── Image State Management ─────────────────────────────────────────────────
+  // 1. Existing saved images loaded ordered by display_order, created_at
+  const [existingImages, setExistingImages] = useState<CarImageRow[]>(() => {
+    const sorted = [...(initialCar?.car_images || [])];
+    sorted.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    return sorted;
+  });
+
+  // 2. Removed image IDs (to be deleted from Supabase)
+  const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
+
+  // 3. Newly selected File objects with preview URLs
+  const [newFiles, setNewFiles] = useState<NewFileItem[]>([]);
+
+  // 4. Key for the single primary image ('existing-{id}' or 'new-{id}')
+  const [primaryImageKey, setPrimaryImageKey] = useState<string>(() => {
+    const existing = initialCar?.car_images || [];
+    const primaryImg = existing.find((img) => img.is_primary) || existing[0];
+    return primaryImg ? `existing-${primaryImg.id}` : "";
+  });
 
   const defaultValues: Partial<CarFormValues> = {
     title: initialCar?.title || "",
@@ -62,12 +76,7 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     description: initialCar?.description || "",
     features: initialCar?.features?.map((f) => f.id) || [],
     extra_specs: [],
-    images: initialCar?.car_images?.map((img) => ({
-      id: img.id,
-      image_url: img.image_url,
-      display_order: img.display_order,
-      is_primary: img.is_primary,
-    })) || [],
+    images: [],
   };
 
   const form = useForm<CarFormValues>({
@@ -75,20 +84,9 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     defaultValues,
   });
 
-  const { register, handleSubmit, watch, setValue, control, formState: { errors } } = form;
-
-  const { fields: imageFields, append: appendImage, remove: removeImage } = useFieldArray({
-    control,
-    name: "images",
-  });
-
-  const { fields: extraSpecFields, append: appendExtraSpec, remove: removeExtraSpec } = useFieldArray({
-    control,
-    name: "extra_specs",
-  });
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = form;
 
   const selectedBrandId = watch("brand_id");
-  const [imageUrlInput, setImageUrlInput] = useState("");
 
   // Load brands on mount if empty
   useEffect(() => {
@@ -103,18 +101,17 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
       }
     }
     loadInitialBrands();
-  }, []);
+  }, [brandsList.length]);
 
   // Load models whenever selectedBrandId changes
   useEffect(() => {
     async function fetchModels() {
-      if (!selectedBrandId) {
+      if (!selectedBrandId || selectedBrandId.trim() === "") {
         setModelsList([]);
         return;
       }
       setIsLoadingModels(true);
 
-      // Check if selectedBrandId is a UUID or name
       const matchedBrand = brandsList.find(
         (b) => b.id === selectedBrandId || b.name?.toLowerCase() === selectedBrandId?.toLowerCase()
       );
@@ -128,7 +125,6 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
         const { data } = await getModelsByBrand(matchedBrand.id);
         setModelsList(data || []);
       } else {
-        // If user typed brand name or UUID
         const { data } = await getModelsByBrand(selectedBrandId);
         setModelsList(data || []);
       }
@@ -138,21 +134,78 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     fetchModels();
   }, [selectedBrandId, brandsList]);
 
-  const handleAddImage = (url: string) => {
-    appendImage({
-      image_url: url,
-      display_order: imageFields.length,
-      is_primary: imageFields.length === 0,
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      newFiles.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    };
+  }, [newFiles]);
+
+  // Ensure there is always a primary image if images exist
+  useEffect(() => {
+    const allKeys = [
+      ...existingImages.map((img) => `existing-${img.id}`),
+      ...newFiles.map((item) => `new-${item.id}`),
+    ];
+    if (allKeys.length > 0 && (!primaryImageKey || !allKeys.includes(primaryImageKey))) {
+      setPrimaryImageKey(allKeys[0]);
+    } else if (allKeys.length === 0) {
+      setPrimaryImageKey("");
+    }
+  }, [existingImages, newFiles, primaryImageKey]);
+
+  // Handle selecting new files from input
+  const handleSelectFiles = (files: File[]) => {
+    const items: NewFileItem[] = files.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    setNewFiles((prev) => {
+      const next = [...prev, ...items];
+      if (!primaryImageKey && existingImages.length === 0 && items.length > 0) {
+        setPrimaryImageKey(`new-${items[0].id}`);
+      }
+      return next;
     });
   };
 
-  const handleSetPrimaryImage = (index: number) => {
-    const currentImages = watch("images");
-    const updated = currentImages.map((img, i) => ({
-      ...img,
-      is_primary: i === index,
-    }));
-    setValue("images", updated);
+  // Handle removing an existing saved image
+  const handleRemoveExisting = (id: string) => {
+    setExistingImages((prev) => prev.filter((img) => img.id !== id));
+    setRemovedImageIds((prev) => [...prev, id]);
+
+    if (primaryImageKey === `existing-${id}`) {
+      const remainingExisting = existingImages.filter((img) => img.id !== id);
+      if (remainingExisting.length > 0) {
+        setPrimaryImageKey(`existing-${remainingExisting[0].id}`);
+      } else if (newFiles.length > 0) {
+        setPrimaryImageKey(`new-${newFiles[0].id}`);
+      } else {
+        setPrimaryImageKey("");
+      }
+    }
+  };
+
+  // Handle removing an unsaved new file
+  const handleRemoveNewFile = (id: string) => {
+    const itemToRemove = newFiles.find((item) => item.id === id);
+    if (itemToRemove) {
+      URL.revokeObjectURL(itemToRemove.previewUrl);
+    }
+    setNewFiles((prev) => prev.filter((item) => item.id !== id));
+
+    if (primaryImageKey === `new-${id}`) {
+      const remainingNew = newFiles.filter((item) => item.id !== id);
+      if (existingImages.length > 0) {
+        setPrimaryImageKey(`existing-${existingImages[0].id}`);
+      } else if (remainingNew.length > 0) {
+        setPrimaryImageKey(`new-${remainingNew[0].id}`);
+      } else {
+        setPrimaryImageKey("");
+      }
+    }
   };
 
   const handleSeedData = async () => {
@@ -163,6 +216,7 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     setIsSeeding(false);
   };
 
+  // ─── Submit Handler ──────────────────────────────────────────────────────────
   const onSubmit = async (data: CarFormValues) => {
     if (!data.brand_id || data.brand_id.trim() === "") {
       setErrorMsg("يرجى اختيار الماركة أولاً");
@@ -176,20 +230,211 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     setIsSubmitting(true);
     setErrorMsg(null);
 
-    let res;
-    if (initialCar) {
-      res = await updateCar(initialCar.id, data);
-    } else {
-      res = await createCar(data);
-    }
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
-    setIsSubmitting(false);
+    try {
+      if (initialCar) {
+        const carId = initialCar.id;
 
-    if (res.success) {
-      router.push("/admin/cars");
-      router.refresh();
-    } else {
-      setErrorMsg(typeof res.error === "string" ? res.error : "حدث خطأ أثناء حفظ البيانات");
+        // 1. Update cars row using only valid columns
+        const updatePayload: Record<string, any> = {
+          title: data.title,
+          slug: data.slug && data.slug.trim() !== "" ? data.slug : undefined,
+          brand_id: data.brand_id,
+          model_id: data.model_id,
+          year: Number(data.year),
+          price: Number(data.price),
+          condition: data.condition,
+          transmission: data.transmission,
+          fuel_type: data.fuel_type,
+          drive_type: data.drive_type,
+          body_type: data.body_type,
+          mileage: Number(data.mileage),
+          engine_capacity: data.engine_capacity ? Number(data.engine_capacity) : null,
+          color: data.color || null,
+          status: data.status,
+          featured: data.featured,
+          description: data.description || null,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: updateError } = await supabase
+          .from("cars")
+          .update(updatePayload)
+          .eq("id", carId);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // 2. Delete removed images from car_images
+        if (removedImageIds.length > 0) {
+          const { error: delError } = await supabase
+            .from("car_images")
+            .delete()
+            .in("id", removedImageIds);
+          if (delError) {
+            throw delError;
+          }
+        }
+
+        // 3. Upload new files to Supabase Storage & insert to car_images
+        const uploadedNewRows: { image_url: string; newKey: string }[] = [];
+        if (newFiles.length > 0) {
+          for (let index = 0; index < newFiles.length; index++) {
+            const item = newFiles[index];
+            const file = item.file;
+            const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+            const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+            const filePath = `cars/${carId}/${Date.now()}-${index}-${sanitizedName}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from("uploads")
+              .upload(filePath, file, { upsert: false });
+
+            if (uploadError) {
+              console.error("Storage upload error:", uploadError);
+              throw uploadError;
+            }
+
+            const { data: publicUrlData } = supabase.storage
+              .from("uploads")
+              .getPublicUrl(filePath);
+
+            uploadedNewRows.push({
+              image_url: publicUrlData.publicUrl,
+              newKey: `new-${item.id}`,
+            });
+          }
+        }
+
+        // 4. Normalize display_order and enforce single is_primary: true
+        // Combine kept existing images + newly uploaded rows
+        type ImageFinalItem = {
+          id?: string;
+          image_url: string;
+          isPrimary: boolean;
+        };
+
+        const finalImagesList: ImageFinalItem[] = [
+          ...existingImages.map((img) => ({
+            id: img.id,
+            image_url: img.image_url,
+            isPrimary: primaryImageKey === `existing-${img.id}`,
+          })),
+          ...uploadedNewRows.map((item) => ({
+            image_url: item.image_url,
+            isPrimary: primaryImageKey === item.newKey,
+          })),
+        ];
+
+        // Ensure at least one image is primary if any images exist
+        const hasPrimary = finalImagesList.some((item) => item.isPrimary);
+        if (!hasPrimary && finalImagesList.length > 0) {
+          finalImagesList[0].isPrimary = true;
+        }
+
+        // Update existing images display_order & is_primary
+        for (let idx = 0; idx < finalImagesList.length; idx++) {
+          const item = finalImagesList[idx];
+          if (item.id) {
+            const { error: updateImgErr } = await supabase
+              .from("car_images")
+              .update({
+                display_order: idx,
+                is_primary: item.isPrimary,
+              })
+              .eq("id", item.id);
+            if (updateImgErr) {
+              console.error("Error updating image order:", updateImgErr);
+            }
+          } else {
+            // Insert newly uploaded image
+            const { error: insertImgErr } = await supabase
+              .from("car_images")
+              .insert({
+                car_id: carId,
+                image_url: item.image_url,
+                display_order: idx,
+                is_primary: item.isPrimary,
+              });
+            if (insertImgErr) {
+              console.error("Error inserting car image:", insertImgErr);
+              throw insertImgErr;
+            }
+          }
+        }
+
+        // 5. Update car_features
+        if (data.features) {
+          await supabase.from("car_features").delete().eq("car_id", carId);
+          if (data.features.length > 0) {
+            const featureInserts = data.features.map((feature_id) => ({
+              car_id: carId,
+              feature_id,
+            }));
+            await supabase.from("car_features").insert(featureInserts);
+          }
+        }
+
+        // 6. Clear removedImageIds & newFiles, re-fetch fresh car + car_images from Supabase
+        setRemovedImageIds([]);
+        newFiles.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+        setNewFiles([]);
+
+        const { data: freshImages } = await supabase
+          .from("car_images")
+          .select("*")
+          .eq("car_id", carId)
+          .order("display_order", { ascending: true })
+          .order("created_at", { ascending: true });
+
+        if (freshImages) {
+          setExistingImages(freshImages as CarImageRow[]);
+          const freshPrimary = freshImages.find((img) => img.is_primary) || freshImages[0];
+          setPrimaryImageKey(freshPrimary ? `existing-${freshPrimary.id}` : "");
+        }
+
+        router.refresh();
+        router.push("/admin/cars");
+      } else {
+        // Create new car flow
+        const res = await createCar(data);
+        if (res.success && res.carId) {
+          // If any newFiles were selected in new car form, upload them
+          if (newFiles.length > 0) {
+            for (let index = 0; index < newFiles.length; index++) {
+              const item = newFiles[index];
+              const file = item.file;
+              const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+              const filePath = `cars/${res.carId}/${Date.now()}-${index}-${sanitizedName}`;
+
+              await supabase.storage.from("uploads").upload(filePath, file);
+              const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(filePath);
+
+              const isPrimary = primaryImageKey === `new-${item.id}` || index === 0;
+              await supabase.from("car_images").insert({
+                car_id: res.carId,
+                image_url: urlData.publicUrl,
+                display_order: index,
+                is_primary: isPrimary,
+              });
+            }
+          }
+          router.push("/admin/cars");
+          router.refresh();
+        } else {
+          setErrorMsg(typeof res.error === "string" ? res.error : "حدث خطأ أثناء حفظ البيانات");
+        }
+      }
+    } catch (err: any) {
+      console.error("Error saving car:", err);
+      setErrorMsg(err?.message || "حدث خطأ أثناء حفظ السيارة وتحديث الصور");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -249,101 +494,103 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
             type="button"
             onClick={handleSeedData}
             disabled={isSeeding}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#C59B27] hover:bg-[#b08820] text-slate-950 font-bold rounded-lg text-xs transition-colors shrink-0 shadow-xs"
+            className="px-4 py-2 bg-[#C59B27] text-slate-950 font-bold text-xs rounded-lg hover:bg-[#b08820] transition-colors shrink-0 disabled:opacity-50"
           >
-            {isSeeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            توليد البيانات الأولية
+            {isSeeding ? "جاري التوليد..." : "توليد ماركات وموديلات افتراضية"}
           </button>
         </div>
       )}
 
+      {/* Error Alert */}
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm font-semibold flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content (2 cols) */}
+          {/* Main Details Column (2 cols) */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Card 1: Basic Information */}
+            {/* Card 1: Primary Info */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-[#C59B27]" />
-                  البيانات الأساسية
-                </h2>
-              </div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Car className="w-5 h-5 text-[#C59B27]" />
+                البيانات الأساسية والتعريفية
+              </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Title */}
-                <div className="sm:col-span-2 space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">عنوان السيارة *</label>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700">
+                    عنوان الإعلان <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
-                    placeholder="مثال: مرسيدس C200 AMG موديل 2024"
+                    placeholder="مثال: مرسيدس بنز S500 موديل 2024 بحالة الزيرو"
                     {...register("title")}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   />
-                  {errors.title && <p className="text-xs font-semibold text-rose-600">{errors.title.message}</p>}
+                  {errors.title && (
+                    <p className="text-rose-500 text-xs font-medium">{errors.title.message}</p>
+                  )}
                 </div>
 
-                {/* Interactive Brand & Model Select Component */}
-                <div className="sm:col-span-2">
-                  <CarBrandModelSelect
-                    selectedBrandId={watch("brand_id")}
-                    selectedModelId={watch("model_id")}
-                    onBrandChange={(brandId) => {
-                      setValue("brand_id", brandId);
-                      setValue("model_id", "");
-                    }}
-                    onModelChange={(modelId) => {
-                      setValue("model_id", modelId);
-                    }}
-                    brandRegister={register("brand_id")}
-                    modelRegister={register("model_id")}
-                    brandError={errors.brand_id?.message}
-                    modelError={errors.model_id?.message}
-                    initialBrands={brandsList}
-                  />
-                </div>
+                {/* Brand & Model Select */}
+                <CarBrandModelSelect
+                  initialBrands={brandsList}
+                  selectedBrandId={selectedBrandId}
+                  selectedModelId={watch("model_id")}
+                  onBrandChange={(val: string) => {
+                    setValue("brand_id", val, { shouldValidate: true });
+                    setValue("model_id", "", { shouldValidate: true });
+                  }}
+                  onModelChange={(val: string) => setValue("model_id", val, { shouldValidate: true })}
+                  brandError={errors.brand_id?.message}
+                  modelError={errors.model_id?.message}
+                />
 
                 {/* Year */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">سنة الصنع *</label>
+                  <label className="block text-xs font-bold text-slate-700">
+                    سنة الصنع <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="number"
                     {...register("year", { valueAsNumber: true })}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   />
-                  {errors.year && <p className="text-xs font-semibold text-rose-600">{errors.year.message}</p>}
+                  {errors.year && (
+                    <p className="text-rose-500 text-xs font-medium">{errors.year.message}</p>
+                  )}
                 </div>
 
                 {/* Price */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">السعر (ج.م) *</label>
+                  <label className="block text-xs font-bold text-slate-700">
+                    السعر المطلوب (ج.م) <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="number"
-                    step="1000"
+                    placeholder="0"
                     {...register("price", { valueAsNumber: true })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   />
-                  {errors.price && <p className="text-xs font-semibold text-rose-600">{errors.price.message}</p>}
+                  {errors.price && (
+                    <p className="text-rose-500 text-xs font-medium">{errors.price.message}</p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Card 2: Technical Specifications */}
+            {/* Card 2: Specs & Specifications */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Car className="w-5 h-5 text-[#C59B27]" />
-                المواصفات الفنية
+              <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">
+                المواصفات الفنية والميكانيكية
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Condition */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-slate-700">حالة السيارة</label>
@@ -351,8 +598,8 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
                     {...register("condition")}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   >
-                    <option value="new">جديدة (زيرو)</option>
-                    <option value="used">مستعملة</option>
+                    <option value="new">زيرو / جديدة (New)</option>
+                    <option value="used">مستعملة معتمدة (Used)</option>
                   </select>
                 </div>
 
@@ -363,10 +610,10 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
                     {...register("transmission")}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   >
-                    <option value="automatic">أوتوماتيك</option>
-                    <option value="manual">مانيوال</option>
+                    <option value="automatic">أوتوماتيك (Automatic)</option>
+                    <option value="manual">يدوي / مانيوال (Manual)</option>
                     <option value="cvt">CVT</option>
-                    <option value="dual_clutch">دبل كلتش</option>
+                    <option value="dual_clutch">دبل كلتش (Dual-Clutch)</option>
                   </select>
                 </div>
 
@@ -377,26 +624,26 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
                     {...register("fuel_type")}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   >
-                    <option value="petrol">بنزين</option>
-                    <option value="diesel">ديزل</option>
-                    <option value="electric">كهرباء</option>
-                    <option value="hybrid">هايبرد</option>
-                    <option value="plugin_hybrid">بلاغ إن هايبرد</option>
-                    <option value="gas">غاز طبيعي</option>
+                    <option value="petrol">بنزين (Petrol)</option>
+                    <option value="diesel">ديزل (Diesel)</option>
+                    <option value="electric">كهرباء بالكامل (Electric)</option>
+                    <option value="hybrid">هايبرد (Hybrid)</option>
+                    <option value="plugin_hybrid">هايبرد قابل للشحن (Plug-in Hybrid)</option>
+                    <option value="gas">غاز طبيعي (Natural Gas)</option>
                   </select>
                 </div>
 
                 {/* Drive Type */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">منظومة الدفع</label>
+                  <label className="block text-xs font-bold text-slate-700">نظام الدفع</label>
                   <select
                     {...register("drive_type")}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
                   >
-                    <option value="fwd">دفع أمامي (FWD)</option>
+                    <option value="fwd">جر أمامي (FWD)</option>
                     <option value="rwd">دفع خلفي (RWD)</option>
-                    <option value="awd">دفع كلي (AWD)</option>
-                    <option value="4wd">دفع رباعي (4WD)</option>
+                    <option value="awd">دفع كلي مستمر (AWD)</option>
+                    <option value="4wd">دفع رباعي (4WD / 4x4)</option>
                   </select>
                 </div>
 
@@ -558,10 +805,14 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
 
             {/* Card 5: Car Images */}
             <CarImageUploader
-              images={watch("images")}
-              onAddImage={handleAddImage}
-              onRemoveImage={removeImage}
-              onSetPrimaryImage={handleSetPrimaryImage}
+              existingImages={existingImages}
+              newFiles={newFiles}
+              primaryImageKey={primaryImageKey}
+              isUploading={isSubmitting}
+              onSelectFiles={handleSelectFiles}
+              onRemoveExisting={handleRemoveExisting}
+              onRemoveNewFile={handleRemoveNewFile}
+              onSetPrimary={(key) => setPrimaryImageKey(key)}
             />
           </div>
         </div>

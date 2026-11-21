@@ -103,7 +103,7 @@ export function FeaturedCarCard({ car }: FeaturedCarCardProps) {
             <Gauge className="w-4 h-4 text-[#c5a059]" />
             <span className="text-[10px] text-slate-400">العداد</span>
             <span className="text-xs text-white font-bold font-mono">
-              {car.mileage === 0 ? "0 كم (جديد)" : `${car.mileage.toLocaleString()} كم`}
+              {car.mileage === 0 ? "0 كم (جديد)" : `${car.mileage.toLocaleString("en-US")} كم`}
             </span>
           </div>
           <div className="flex flex-col items-center justify-center text-center gap-1 border-x border-white/5">
@@ -128,7 +128,7 @@ export function FeaturedCarCard({ car }: FeaturedCarCardProps) {
             <div className="flex items-baseline justify-between">
               <span className="text-[11px] text-emerald-400 font-bold">السعر الحالي</span>
               <div className="text-xl font-black text-white font-mono tracking-tight">
-                {car.price.toLocaleString("ar-EG")}
+                {car.price.toLocaleString("en-US")}
                 <span className="text-xs font-bold text-slate-400 mr-1">ج.م</span>
               </div>
             </div>

@@ -13,6 +13,7 @@ import {
   X,
   Sparkles,
 } from "lucide-react";
+import { AdminPagination } from "@/modules/admin/components/AdminPagination";
 import { addBrand, deleteBrand, addModel, deleteModel } from "../actions/brands";
 
 interface BrandsManagementClientProps {
@@ -22,6 +23,8 @@ interface BrandsManagementClientProps {
 export function BrandsManagementClient({ initialBrands }: BrandsManagementClientProps) {
   const [brands, setBrands] = useState(initialBrands);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
   const [expandedBrandId, setExpandedBrandId] = useState<string | null>(
     initialBrands[0]?.id || null
   );
@@ -40,6 +43,12 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
 
   const filteredBrands = brands.filter((brand: any) =>
     brand.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredBrands.length / pageSize));
+  const paginatedBrands = filteredBrands.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const handleAddBrand = (e: React.FormEvent) => {
@@ -88,7 +97,7 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
 
   const handleDeleteModel = (brandId: string, modelId: string) => {
     if (!confirm("هل أنت متأكد من حذف هذا الموديل؟")) return;
-    
+
     startTransition(async () => {
       const res = await deleteModel(modelId);
       if (res.success) {
@@ -111,7 +120,7 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
 
   const handleDeleteBrand = (brandId: string) => {
     if (!confirm("هل أنت متأكد من حذف هذه الماركة وجميع الموديلات التابعة لها؟")) return;
-    
+
     startTransition(async () => {
       const res = await deleteBrand(brandId);
       if (res.success) {
@@ -155,7 +164,10 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
             type="text"
             placeholder="بحث باسم الماركة..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-10 pl-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
           />
         </div>
@@ -177,133 +189,152 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
 
       {/* ── Brands Accordions / Grid ──────────────────────────── */}
       <div className="space-y-4">
-        {filteredBrands.map((brand) => {
-          const isExpanded = expandedBrandId === brand.id;
-          return (
-            <div
-              key={brand.id}
-              className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs ${
-                isExpanded
-                  ? "border-amber-500/50 ring-2 ring-amber-500/10"
-                  : "border-slate-200/80 hover:border-slate-300"
-              }`}
-            >
-              {/* Brand Header Item */}
+        {paginatedBrands.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-400">
+            <Tags className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm font-medium">لا توجد ماركات تطابق البحث</p>
+          </div>
+        ) : (
+          paginatedBrands.map((brand) => {
+            const isExpanded = expandedBrandId === brand.id;
+            return (
               <div
-                onClick={() => setExpandedBrandId(isExpanded ? null : brand.id)}
-                className="flex items-center justify-between p-5 cursor-pointer select-none hover:bg-slate-50/60 transition-colors"
+                key={brand.id}
+                className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs ${isExpanded
+                    ? "border-amber-500/50 ring-2 ring-amber-500/10"
+                    : "border-slate-200/80 hover:border-slate-300"
+                  }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-2xl shadow-xs shrink-0">
-                    {brand.logo_url || "🚗"}
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-base">
-                      {brand.name}
-                    </h3>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                      <span className="flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                        <Layers className="w-3 h-3" />
-                        {brand.car_models?.length || 0} موديل
-                      </span>
+                {/* Brand Header Item */}
+                <div
+                  onClick={() => setExpandedBrandId(isExpanded ? null : brand.id)}
+                  className="flex items-center justify-between p-5 cursor-pointer select-none hover:bg-slate-50/60 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-2xl shadow-xs shrink-0">
+                      {brand.logo_url || "🚗"}
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-base">
+                        {brand.name}
+                      </h3>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                        <span className="flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                          <Layers className="w-3 h-3" />
+                          {brand.car_models?.length || 0} موديل
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTargetBrandId(brand.id);
-                      setIsAddModelOpen(true);
-                    }}
-                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-700 font-bold text-xs transition-colors border border-slate-200/60"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>إضافة موديل فرعي</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteBrand(brand.id);
-                    }}
-                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
-                    title="حذف الماركة"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-
-                  <div className="p-1.5 text-slate-400">
-                    {isExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-amber-600" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5" />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Sub-models Expanded List */}
-              {isExpanded && (
-                <div className="bg-slate-50/50 p-5 border-t border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      الموديلات الفرعية المسجلة ({(brand.car_models || []).length})
-                    </h4>
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       disabled={isPending}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setTargetBrandId(brand.id);
                         setIsAddModelOpen(true);
                       }}
-                      className="sm:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 text-white font-bold text-xs disabled:opacity-50"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-amber-50 hover:text-amber-700 text-slate-700 font-bold text-xs transition-colors border border-slate-200/60"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      إضافة موديل
+                      <span>إضافة نوع فرعي</span>
                     </button>
-                  </div>
 
-                  {(!brand.car_models || brand.car_models.length === 0) ? (
-                    <div className="text-center py-8 text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
-                      لا توجد موديلات فرعية مسجلة لهذه الماركة بعد
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteBrand(brand.id);
+                      }}
+                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="حذف الماركة"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <div className="p-1.5 text-slate-400">
+                      {isExpanded ? (
+                        <ChevronUp className="w-5 h-5 text-amber-600" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5" />
+                      )}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {brand.car_models.map((model: any) => (
-                        <div
-                          key={model.id}
-                          className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-200/80 hover:border-amber-300 shadow-2xs group transition-all"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-2 h-2 rounded-full bg-amber-500" />
-                            <span className="font-bold text-slate-800 text-xs">
-                              {model.name}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() => handleDeleteModel(brand.id, model.id)}
-                            className="text-slate-300 group-hover:text-rose-500 hover:bg-rose-50 p-1 rounded-md transition-colors disabled:opacity-50"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {/* Sub-models Expanded List */}
+                {isExpanded && (
+                  <div className="bg-slate-50/50 p-5 border-t border-slate-100 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        الموديلات الفرعية المسجلة ({(brand.car_models || []).length})
+                      </h4>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => {
+                          setTargetBrandId(brand.id);
+                          setIsAddModelOpen(true);
+                        }}
+                        className="sm:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 text-white font-bold text-xs disabled:opacity-50"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        إضافة موديل
+                      </button>
+                    </div>
+
+                    {(!brand.car_models || brand.car_models.length === 0) ? (
+                      <div className="text-center py-8 text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+                        لا توجد موديلات فرعية مسجلة لهذه الماركة بعد
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {brand.car_models.map((model: any) => (
+                          <div
+                            key={model.id}
+                            className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-200/80 hover:border-amber-300 shadow-2xs group transition-all"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span className="font-bold text-slate-800 text-xs">
+                                {model.name}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isPending}
+                              onClick={() => handleDeleteModel(brand.id, model.id)}
+                              className="text-slate-300 group-hover:text-rose-500 hover:bg-rose-50 p-1 rounded-md transition-colors disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+
+        {/* Brands Pagination */}
+        <AdminPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredBrands.length}
+          pageSize={pageSize}
+          onPageChange={(p) => {
+            setCurrentPage(p);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          itemName="ماركة"
+        />
       </div>
 
       {/* ── Modal: Add New Brand ──────────────────────────────── */}
@@ -348,11 +379,10 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
                       key={icon}
                       type="button"
                       onClick={() => setNewBrandLogo(icon)}
-                      className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center border transition-all ${
-                        newBrandLogo === icon
+                      className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center border transition-all ${newBrandLogo === icon
                           ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/20"
                           : "border-slate-200 hover:bg-slate-50"
-                      }`}
+                        }`}
                     >
                       {icon}
                     </button>
@@ -388,7 +418,7 @@ export function BrandsManagementClient({ initialBrands }: BrandsManagementClient
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                 <Layers className="w-5 h-5 text-amber-600" />
-                إضافة موديل فرعي
+                إضافة نوع فرعي
               </h3>
               <button
                 onClick={() => setIsAddModelOpen(false)}

@@ -35,8 +35,12 @@ export function ProtectionFilmDetailClient({ film }: ProtectionFilmDetailClientP
   const [contactMethod, setContactMethod] = useState<"whatsapp" | "phone">("whatsapp");
   const [notes, setNotes] = useState("");
 
-  const whatsappMessage = `مرحباً أولاد العم، أرغب في الاستفسار عن باقة: ${film.title}${film.price || film.price_starting_from ? ` - السعر: ${((film as any).price || film.price_starting_from).toLocaleString("ar-EG")} ج.م` : ""}`;
-  const whatsappUrl = `https://wa.me/201000000000?text=${encodeURIComponent(whatsappMessage)}`;
+  const priceVal = (film as any).price || film.price_starting_from;
+  const priceFormatted = priceVal ? Number(priceVal).toLocaleString("en-US") : "—";
+  const warrantyText = film.warranty_years ? `${film.warranty_years} سنوات` : "ضمان معتمد";
+  const filmTypeArabic = film.film_type === "ppf" ? "PPF أفلام حماية" : film.film_type === "ceramic" ? "نانو سيراميك" : film.film_type === "tinting" ? "عزل حراري وتفييم" : film.film_type === "package" ? "باقة شاملة" : (film.film_type || "أفلام حماية");
+  const whatsappMessage = `مرحباً معرض ولاد العم، أرغب في حجز والاستفسار عن باقة: ${film.title} (${filmTypeArabic}) - الضمان: ${warrantyText} - السعر: ${priceFormatted} ج.م`;
+  const whatsappUrl = `https://wa.me/201007946824?text=${encodeURIComponent(whatsappMessage)}`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +129,7 @@ export function ProtectionFilmDetailClient({ film }: ProtectionFilmDetailClientP
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 min-w-[200px] text-right">
                     <span className="text-xs text-slate-500 font-bold block mb-1">السعر يبدأ من</span>
                     <span className="text-3xl md:text-4xl font-black text-amber-600 font-mono">
-                      {((film as any).price || film.price_starting_from).toLocaleString("ar-EG")}
+                      {priceFormatted}
                     </span>
                     <span className="text-sm font-bold text-slate-600 mr-2">ج.م</span>
                   </div>
@@ -149,11 +153,10 @@ export function ProtectionFilmDetailClient({ film }: ProtectionFilmDetailClientP
                       <button
                         key={img.id}
                         onClick={() => setActiveImage(idx)}
-                        className={`relative w-28 aspect-[16/10] rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${
-                          activeImage === idx
+                        className={`relative w-28 aspect-[16/10] rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${activeImage === idx
                             ? "border-amber-500 ring-2 ring-amber-500/30 scale-105 shadow-md"
                             : "border-slate-200 opacity-60 hover:opacity-100"
-                        }`}
+                          }`}
                       >
                         <img src={img.image_url} alt="" className="w-full h-full object-cover" />
                       </button>
@@ -255,7 +258,7 @@ export function ProtectionFilmDetailClient({ film }: ProtectionFilmDetailClientP
                     <input
                       type="tel"
                       required
-                      placeholder="010XXXXXXXX"
+                      placeholder="01007946824"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 font-mono focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
@@ -267,22 +270,20 @@ export function ProtectionFilmDetailClient({ film }: ProtectionFilmDetailClientP
                       <button
                         type="button"
                         onClick={() => setContactMethod("whatsapp")}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                          contactMethod === "whatsapp"
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all ${contactMethod === "whatsapp"
                             ? "bg-emerald-50 text-emerald-700 border-emerald-500 ring-1 ring-emerald-500"
                             : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <MessageSquare className="w-4 h-4" />واتساب
                       </button>
                       <button
                         type="button"
                         onClick={() => setContactMethod("phone")}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                          contactMethod === "phone"
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all ${contactMethod === "phone"
                             ? "bg-blue-50 text-blue-700 border-blue-500 ring-1 ring-blue-500"
                             : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <PhoneCall className="w-4 h-4" />اتصال
                       </button>

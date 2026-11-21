@@ -226,6 +226,8 @@ export async function getCarById(id: string) {
       )
       .eq("id", id)
       .is("deleted_at", null)
+      .order("display_order", { foreignTable: "car_images", ascending: true })
+      .order("created_at", { foreignTable: "car_images", ascending: true })
       .single();
 
     if (error) {

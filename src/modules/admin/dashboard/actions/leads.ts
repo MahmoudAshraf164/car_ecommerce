@@ -22,6 +22,7 @@ export interface AdminLead {
   car: {
     id: string;
     title: string;
+    price?: number | null;
     car_images?: { image_url: string; is_primary: boolean }[];
   } | null;
   lead_notes: {
@@ -30,16 +31,34 @@ export interface AdminLead {
     created_at: string;
     created_by: string | null;
   }[];
+  lead_status_history?: {
+    id: string;
+    old_status: string | null;
+    new_status: string;
+    notes: string | null;
+    created_at: string;
+  }[];
+}
+
+export interface LeadStatusHistory {
+  id: string;
+  lead_id: string;
+  old_status: string | null;
+  new_status: string;
+  notes: string | null;
+  created_at: string;
 }
 
 /**
- * Fetch all leads for admin with customer, car, and notes relations.
+ * Fetch all leads for admin with customer, car, notes, and status history.
  */
-export async function getAdminLeads(filters: {
-  status?: string;
-  lead_type?: string;
-  search?: string;
-} = {}): Promise<{ data: AdminLead[]; error: string | null }> {
+export async function getAdminLeads(
+  filters: {
+    status?: string;
+    lead_type?: string;
+    search?: string;
+  } = {}
+): Promise<{ data: AdminLead[]; error: string | null }> {
   try {
     const supabase = await createServerClient();
 
@@ -56,8 +75,9 @@ export async function getAdminLeads(filters: {
         created_at,
         updated_at,
         customers(id, name, phone, email),
-        cars(id, title, car_images(image_url, is_primary)),
-        lead_notes(id, note, created_at, created_by)
+        cars(id, title, price, car_images(image_url, is_primary)),
+        lead_notes(id, note, created_at, created_by),
+        lead_status_history(id, old_status, new_status, notes, created_at)
       `
       )
       .is("deleted_at", null)
@@ -92,6 +112,10 @@ export async function getAdminLeads(filters: {
         (a: any, b: any) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       ),
+      lead_status_history: (lead.lead_status_history || []).sort(
+        (a: any, b: any) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ),
     })) as AdminLead[];
 
     // Apply search client-side after DB fetch for simplicity
@@ -117,7 +141,7 @@ export async function getAdminLeads(filters: {
 }
 
 /**
- * Update a lead's status and log to lead_status_history.
+ * Update a lead's status, log to lead_status_history, and auto-mark car sold if won.
  */
 export async function updateLeadStatus(
   leadId: string,
@@ -127,15 +151,16 @@ export async function updateLeadStatus(
   try {
     const supabase = await createServerClient();
 
-    // Get current status for history
+    // Get current status and relations for history + car sold logic
     const { data: currentLead } = await supabase
       .from("leads")
-      .select("status, customer_id")
+      .select("status, customer_id, car_id")
       .eq("id", leadId)
       .single();
 
     const oldStatus = currentLead?.status as LeadStatus | null;
     const customerId = currentLead?.customer_id;
+    const carId = currentLead?.car_id;
 
     // Update lead status
     const { error: updateError } = await supabase
@@ -143,17 +168,15 @@ export async function updateLeadStatus(
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq("id", leadId);
 
-    if (updateError) {
-      throw updateError;
-    }
+    if (updateError) throw updateError;
 
-    // Log status history safely
+    // Log status history
     await supabase.from("lead_status_history").insert({
       lead_id: leadId,
       old_status: oldStatus,
       new_status: newStatus,
-      notes: note || "تم تغيير حالة الصفقة",
-      changed_by: null, // Avoid invalid user UUID references
+      notes: note?.trim() || null,
+      changed_by: null,
     });
 
     // Add system note if provided
@@ -165,15 +188,27 @@ export async function updateLeadStatus(
       });
     }
 
-    // Update customer status if won (to "converted" / contracted)
+    // Auto-mark car as SOLD when lead is won
+    if (newStatus === "won" && carId) {
+      await supabase
+        .from("cars")
+        .update({ status: "sold", updated_at: new Date().toISOString() })
+        .eq("id", carId);
+    }
+
+    // Update customer updated_at if won
     if (newStatus === "won" && customerId) {
-       await supabase
-         .from("customers")
-         .update({ updated_at: new Date().toISOString() }) // We can update a flag if it exists, or just updated_at.
-         .eq("id", customerId);
+      await supabase
+        .from("customers")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", customerId);
     }
 
     revalidatePath("/admin/orders");
+    revalidatePath("/admin/cars");
+    revalidatePath("/admin/customers");
+    revalidatePath("/admin");
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || "Failed to update lead status" };
@@ -204,5 +239,26 @@ export async function addLeadNote(
     return { success: true, noteId: data?.id };
   } catch (err: any) {
     return { success: false, error: err?.message || "Failed to add note" };
+  }
+}
+
+/**
+ * Fetch status history for a lead (chronological ASC).
+ */
+export async function getLeadStatusHistory(
+  leadId: string
+): Promise<{ data: LeadStatusHistory[]; error: string | null }> {
+  try {
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from("lead_status_history")
+      .select("id, lead_id, old_status, new_status, notes, created_at")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: true });
+
+    if (error) return { data: [], error: error.message };
+    return { data: data || [], error: null };
+  } catch (err: any) {
+    return { data: [], error: err?.message || "Failed to fetch history" };
   }
 }

@@ -138,7 +138,7 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
 
   const whatsappPhone = "201007946824";
   const whatsappMessage = revealedPrice
-    ? `مرحباً معرض ولاد العم، أريد الاستفسار عن السيارة: ${car.title} موديل ${car.year} — السعر المعروض: ${revealedPrice.toLocaleString("ar-EG")} ج.م`
+    ? `مرحباً معرض ولاد العم، أريد الاستفسار عن السيارة: ${car.title} موديل ${car.year} — السعر المعروض: ${revealedPrice.toLocaleString("en-US")} ج.م`
     : `مرحباً معرض ولاد العم، أريد الاستفسار عن السيارة: ${car.title} موديل ${car.year}`;
   const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
     whatsappMessage
@@ -268,7 +268,7 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                         سعر السيارة الحالي
                       </p>
                       <p className="text-3xl font-black text-amber-600 font-mono">
-                        {revealedPrice.toLocaleString("ar-EG")}
+                        {revealedPrice.toLocaleString("en-US")}
                         <span className="text-sm font-normal text-slate-600 mr-2">
                           ج.م
                         </span>
@@ -458,7 +458,7 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                 <p className="text-sm text-slate-500 font-medium">
                   موديل {car.year} •{" "}
                   {car.mileage > 0
-                    ? `${car.mileage.toLocaleString("ar-EG")} كم`
+                    ? `${car.mileage.toLocaleString("en-US")} كم`
                     : "زيرو كيلومتر"}
                 </p>
               </div>
@@ -478,7 +478,7 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                       </span>
                     </div>
                     <span className="text-3xl md:text-4xl font-black text-amber-600 font-mono">
-                      {revealedPrice.toLocaleString("ar-EG")}
+                      {revealedPrice.toLocaleString("en-US")}
                     </span>
                     <span className="text-sm font-bold text-slate-600 mr-2">
                       ج.م
@@ -560,7 +560,7 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                 label="المسافة المقطوعة"
                 value={
                   car.mileage > 0
-                    ? `${car.mileage.toLocaleString("ar-EG")} كم`
+                    ? `${car.mileage.toLocaleString("en-US")} كم`
                     : "زيرو"
                 }
               />
@@ -663,7 +663,7 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                     سعر السيارة الحالي
                   </p>
                   <p className="text-4xl font-black text-amber-600 font-mono">
-                    {revealedPrice.toLocaleString("ar-EG")}
+                    {revealedPrice.toLocaleString("en-US")}
                   </p>
                   <p className="text-sm text-slate-500 mt-1">جنيه مصري</p>
                 </div>

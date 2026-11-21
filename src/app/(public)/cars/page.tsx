@@ -1,38 +1,44 @@
 import { Suspense } from "react";
-import { getPublicCars } from "@/modules/public/actions/cars";
-import { createServerClient } from "@/modules/shared/lib/supabase/server";
+import { getPublicCars, getBrandsWithModels } from "@/modules/public/actions/cars";
 import { CarsClientCatalog } from "@/modules/public/cars/components/CarsClientCatalog";
 import { Sparkles } from "lucide-react";
 
-async function getBrandsForFilter() {
-  try {
-    const supabase = await createServerClient();
-    const { data } = await supabase
-      .from("brands")
-      .select("id, name")
-      .is("vehicle_type", "car")
-      .order("name");
-    return data || [];
-  } catch {
-    return [];
-  }
-}
-
 export const metadata = {
-  title: "أسطول السيارات الفاخرة | أولاد العم للسيارات",
+  title: "أسطول السيارات الفاخرة | ولاد العم للسيارات",
   description:
     "تصفح أسطول سياراتنا الفاخرة من مرسيدس، بورش، بي إم دبليو، رنج روفر والمزيد. سيارات جديدة ومستعملة معتمدة بضمان وتسليم فوري.",
 };
 
-export default async function PublicCarsCatalogPage() {
+export default async function PublicCarsCatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const sp = await searchParams;
+  const page = parseInt(sp.page || "1", 10);
+  const limit = 12;
+
   const [{ data: cars, total }, brands] = await Promise.all([
-    getPublicCars({ limit: 50 }),
-    getBrandsForFilter(),
+    getPublicCars({
+      search: sp.search,
+      brand_id: sp.brand_id,
+      model_id: sp.model_id,
+      condition: sp.condition,
+      transmission: sp.transmission,
+      fuel_type: sp.fuel_type,
+      drive_type: sp.drive_type,
+      body_type: sp.body_type,
+      min_year: sp.year ? Number(sp.year) : undefined,
+      max_year: sp.year ? Number(sp.year) : undefined,
+      page,
+      limit,
+    }),
+    getBrandsWithModels(),
   ]);
 
   return (
     <div className="space-y-8 pb-16 font-sans text-right" dir="rtl">
-      {/* ── Dark Hero Section ─────────────────────────────────── */}
+      {/* ── Dark Hero Section ─────────────────────────────────────────── */}
       <section className="relative bg-[#111215] text-white py-16 px-4 sm:px-6 lg:px-8 border-b border-neutral-800 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
@@ -46,11 +52,11 @@ export default async function PublicCarsCatalogPage() {
         <div className="relative z-10 max-w-7xl mx-auto space-y-4 text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#c5a059]/15 border border-[#c5a059]/30 text-[#c5a059] text-xs font-bold">
             <Sparkles className="w-4 h-4" />
-            <span>أسطول أولاد العم المعتمد VIP</span>
+            <span>أسطول ولاد العم المعتمد VIP</span>
           </span>
 
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-            أسطول السيارات الفاخرة المتاحة للبيع والتسليم الفوري 🏎️
+            أسطول السيارات الفاخرة المتاحة للبيع والتسليم الفوري 🎖️
           </h1>
 
           <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto font-normal">
@@ -61,7 +67,13 @@ export default async function PublicCarsCatalogPage() {
 
       {/* Client component handles filtering, search, and display */}
       <Suspense fallback={<CarsCatalogSkeleton />}>
-        <CarsClientCatalog initialCars={cars} totalCount={total} brands={brands} />
+        <CarsClientCatalog
+          initialCars={cars}
+          totalCount={total}
+          brands={brands}
+          currentPage={page}
+          pageSize={limit}
+        />
       </Suspense>
     </div>
   );
@@ -69,20 +81,23 @@ export default async function PublicCarsCatalogPage() {
 
 function CarsCatalogSkeleton() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-md h-20 animate-pulse" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden animate-pulse">
-            <div className="h-56 bg-slate-200" />
-            <div className="p-5 space-y-3">
-              <div className="h-3 bg-slate-200 rounded w-1/2" />
-              <div className="h-4 bg-slate-200 rounded w-3/4" />
-              <div className="h-3 bg-slate-200 rounded w-full" />
-              <div className="h-10 bg-slate-200 rounded-xl mt-4" />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-6">
+      <div className="hidden lg:block w-64 h-96 bg-white rounded-2xl border border-slate-200 animate-pulse" />
+      <div className="flex-1 space-y-6">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-md h-10 animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden animate-pulse">
+              <div className="h-52 bg-slate-200" />
+              <div className="p-4 space-y-3">
+                <div className="h-3 bg-slate-200 rounded w-1/2" />
+                <div className="h-4 bg-slate-200 rounded w-3/4" />
+                <div className="h-3 bg-slate-200 rounded w-full" />
+                <div className="h-10 bg-slate-200 rounded-xl mt-4" />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

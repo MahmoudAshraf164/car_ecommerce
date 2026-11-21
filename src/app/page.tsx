@@ -6,6 +6,7 @@ import {
 } from "@/modules/public/components/HeaderFooter";
 import { FeaturedCarCard } from "@/modules/public/cars/components/FeaturedCarCard";
 import { createServerClient } from "@/modules/shared/lib/supabase/server";
+import { getCompanySettings } from "@/modules/shared/lib/settings.server";
 import type { CarWithRelations } from "@/modules/admin/cars/types/car.types";
 import type { ProtectionFilmWithImages } from "@/modules/public/actions/protection-films";
 
@@ -15,18 +16,35 @@ export const metadata = {
     "وجهتك الأولى للسيارات المتميزة وأفلام الحماية الاحترافية PPF والنانو سيراميك. معرض ولاد العم في منوف، المنوفية، مصر — أجيال من الثقة والالتزام.",
 };
 
+// ── getFeaturedCars: returns featured cars, falls back to latest available ──
 async function getFeaturedCars(): Promise<CarWithRelations[]> {
   try {
     const supabase = await createServerClient();
-    const { data } = await supabase
+
+    // First try featured
+    const { data: featured } = await supabase
       .from("cars")
       .select(`*, brand:brands(id, name, logo_url), car_images(*)`)
       .is("deleted_at", null)
       .eq("featured", true)
-      .in("status", ["available", "reserved"])
+      .eq("status", "available")
       .order("created_at", { ascending: false })
-      .limit(4);
-    return (data as CarWithRelations[]) || [];
+      .limit(6);
+
+    if (featured && featured.length > 0) {
+      return featured as CarWithRelations[];
+    }
+
+    // Fallback: latest available cars
+    const { data: latest } = await supabase
+      .from("cars")
+      .select(`*, brand:brands(id, name, logo_url), car_images(*)`)
+      .is("deleted_at", null)
+      .eq("status", "available")
+      .order("created_at", { ascending: false })
+      .limit(6);
+
+    return (latest as CarWithRelations[]) || [];
   } catch {
     return [];
   }
@@ -47,23 +65,7 @@ async function getFeaturedProtectionFilms(): Promise<ProtectionFilmWithImages[]>
   }
 }
 
-const transmissionLabels: Record<string, string> = {
-  automatic: "أوتوماتيك",
-  manual: "يدوي",
-  cvt: "CVT",
-  dual_clutch: "دوبل كلاتش",
-};
-
-const fuelLabels: Record<string, string> = {
-  petrol: "بنزين",
-  diesel: "ديزل",
-  electric: "كهربائي",
-  hybrid: "هايبرد",
-  plugin_hybrid: "هايبرد مدمج",
-  gas: "غاز",
-};
-
-// ── Real testimonials ─────────────────────────────────────────────────────────
+// ── Testimonials ─────────────────────────────────────────────────────────────
 const testimonials = [
   {
     id: 1,
@@ -74,7 +76,7 @@ const testimonials = [
   {
     id: 2,
     name: "محمد عبدالله",
-    text: "معرض ممتاز والقائمين علي المعرض منتهي الاحترام والالتزام. سيارتي اتسلمتها بحالة مثالية.",
+    text: "معرض ممتاز والقائمين على المعرض منتهى الاحترام والالتزام. سيارتي اتسلمتها بحالة مثالية.",
     stars: 5,
   },
   {
@@ -92,17 +94,22 @@ const testimonials = [
 ];
 
 export default async function HomePage() {
-  const [featuredCars, protectionFilms] = await Promise.all([
+  const [featuredCars, protectionFilms, settings] = await Promise.all([
     getFeaturedCars(),
     getFeaturedProtectionFilms(),
+    getCompanySettings(),
   ]);
+
+  const { showroom, contacts, hero } = settings;
+  const primaryPhone = contacts.primaryPhone || "01007946824";
+  const whatsappNumber = contacts.whatsappNumber || "201007946824";
 
   return (
     <div
       className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col"
       dir="rtl"
     >
-      <PublicHeader />
+      <PublicHeader showroom={showroom} contacts={contacts} />
       <main className="flex-1">
         <div className="flex flex-col w-full pb-16">
           {/* ==================== HERO SECTION ==================== */}
@@ -110,11 +117,11 @@ export default async function HomePage() {
             className="relative w-full min-h-[680px] flex items-center overflow-hidden -mt-20 pt-20"
             id="hero"
           >
-            {/* Hero background — brand image */}
+            {/* Hero background — live banner image from settings */}
             <div className="absolute inset-0 z-0">
               <img
-                src="/welad-el3am-hero.png"
-                alt="معرض ولاد العم للسيارات وأفلام الحماية"
+                src={hero.bannerUrl || "/welad-el3am-hero.png"}
+                alt={hero.title || showroom.name || "معرض ولاد العم للسيارات وأفلام الحماية"}
                 className="w-full h-full object-cover"
               />
               {/* Luxury gradient overlays */}
@@ -144,8 +151,8 @@ export default async function HomePage() {
 
                 {/* Sub-headline */}
                 <p className="text-base md:text-lg text-slate-300 max-w-xl leading-relaxed">
-                  أجيال من الثقة والالتزام — وجهتك الأولى للسيارات المتميزة
-                  وباقات PPF والنانو سيراميك في منوف، المنوفية.
+                  {hero.subtitle ||
+                    "أجيال من الثقة والالتزام — وجهتك الأولى للسيارات المتميزة وباقات PPF والنانو سيراميك في منوف، المنوفية."}
                 </p>
 
                 {/* CTA Buttons */}
@@ -180,7 +187,7 @@ export default async function HomePage() {
                   ].map((badge) => (
                     <div
                       key={badge.label}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/8 backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-sm border border-white/10 text-white text-[11px] font-bold"
                     >
                       <span className="material-symbols-outlined text-[14px] text-[#c5a059]">
                         {badge.icon}
@@ -202,11 +209,7 @@ export default async function HomePage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 {[
                   { number: "+10", label: "سنوات من الخبرة", icon: "history_edu" },
-                  {
-                    number: "+500",
-                    label: "عميل راضٍ يثق بنا",
-                    icon: "groups",
-                  },
+                  { number: "+500", label: "عميل راضٍ يثق بنا", icon: "groups" },
                   { number: "100%", label: "شفافية وأمان", icon: "verified_user" },
                   { number: "10", label: "سنوات ضمان PPF", icon: "shield" },
                 ].map((stat) => (
@@ -245,7 +248,9 @@ export default async function HomePage() {
                   </span>
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-900">
-                  السيارات المميزة
+                  {featuredCars.length > 0
+                    ? "السيارات المميزة"
+                    : "أحدث السيارات المتاحة"}
                 </h2>
                 <p className="text-sm text-slate-500">
                   مجموعة منتقاة من أفضل السيارات المتاحة للتسليم المباشر.
@@ -264,21 +269,14 @@ export default async function HomePage() {
 
             {featuredCars.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {featuredCars.map((car) => {
-                  const primaryImage =
-                    car.car_images?.find((img) => img.is_primary)?.image_url ||
-                    car.car_images?.[0]?.image_url ||
-                    null;
-
-                  return (
-                    <FeaturedCarCard key={car.id} car={car} />
-                  );
-                })}
+                {featuredCars.map((car) => (
+                  <FeaturedCarCard key={car.id} car={car} />
+                ))}
               </div>
             ) : (
               <div className="text-center py-12 space-y-3">
                 <p className="text-slate-500 text-sm">
-                  لا توجد سيارات مميزة متاحة حالياً.
+                  لا توجد سيارات متاحة حالياً — تواصل معنا لأحدث الوارد.
                 </p>
                 <Link
                   href="/cars"
@@ -332,6 +330,13 @@ export default async function HomePage() {
                       film.protection_film_images?.[0]?.image_url ||
                       null;
 
+                    const priceVal = (film as any).price || film.price_starting_from;
+                    const priceFormatted = priceVal ? Number(priceVal).toLocaleString("en-US") : "—";
+                    const warrantyText = film.warranty_years ? `${film.warranty_years} سنوات` : "ضمان معتمد";
+                    const filmTypeArabic = film.film_type === "ppf" ? "PPF أفلام حماية" : film.film_type === "ceramic" ? "نانو سيراميك" : film.film_type === "tinting" ? "عزل حراري وتفييم" : film.film_type === "package" ? "باقة شاملة" : (film.film_type || "أفلام حماية");
+                    const filmWhatsappMsg = `مرحباً معرض ولاد العم، أرغب في حجز والاستفسار عن باقة: ${film.title} (${filmTypeArabic}) - الضمان: ${warrantyText} - السعر: ${priceFormatted} ج.م`;
+                    const filmWhatsappUrl = `https://wa.me/201007946824?text=${encodeURIComponent(filmWhatsappMsg)}`;
+
                     return (
                       <article
                         key={film.id}
@@ -383,21 +388,20 @@ export default async function HomePage() {
                                 السعر يبدأ من
                               </span>
                               <span className="text-lg font-black text-[#c5a059]">
-                                {(
-                                  (film as any).price ||
-                                  film.price_starting_from
-                                )?.toLocaleString("ar-EG") || "—"}{" "}
+                                {priceFormatted}{" "}
                                 <span className="text-xs text-slate-500 font-normal">
                                   ج.م
                                 </span>
                               </span>
                             </div>
-                            <Link
-                              href={`/protection-films/${film.slug || film.id}`}
-                              className="px-5 py-2 rounded-lg bg-[#c5a059] hover:bg-[#b08d48] text-white text-xs font-bold transition-all shadow-sm"
+                            <a
+                              href={filmWhatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-5 py-2.5 rounded-xl bg-gradient-to-l from-[#c5a059] to-[#e8c97a] hover:from-[#b08820] hover:to-[#d4af37] text-[#121316] text-xs font-black transition-all shadow-sm flex items-center gap-1.5"
                             >
-                              التفاصيل والحجز
-                            </Link>
+                              <span>التفاصيل والحجز</span>
+                            </a>
                           </div>
                         </div>
                       </article>
@@ -420,7 +424,7 @@ export default async function HomePage() {
             </div>
           </section>
 
-          {/* ==================== ABOUT US / من نحن ==================== */}
+          {/* ==================== ABOUT US ==================== */}
           <section
             className="w-full max-w-[1440px] mx-auto px-4 md:px-12 py-16"
             id="about"
@@ -584,17 +588,17 @@ export default async function HomePage() {
                     باقة الحماية المناسبة.
                   </p>
                   <a
-                    href="tel:01007946824"
+                    href={`tel:${primaryPhone}`}
                     className="mt-2 inline-block text-[#c5a059] font-mono font-black text-lg hover:text-amber-300 transition-colors"
                     dir="ltr"
                   >
-                    010 0794 6824
+                    {primaryPhone}
                   </a>
                 </div>
               </div>
               <div className="flex flex-wrap gap-3 shrink-0">
                 <a
-                  href="tel:01007946824"
+                  href={`tel:${primaryPhone}`}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#c5a059] text-[#121316] font-black text-sm hover:bg-amber-400 transition-all shadow-lg shadow-[#c5a059]/30"
                 >
                   <span className="material-symbols-outlined text-[18px]">
@@ -603,7 +607,7 @@ export default async function HomePage() {
                   اتصل الآن
                 </a>
                 <a
-                  href="https://wa.me/201007946824"
+                  href={`https://wa.me/${whatsappNumber}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 text-white font-bold text-sm hover:bg-white/20 transition-all border border-white/20"
@@ -618,7 +622,7 @@ export default async function HomePage() {
           </section>
         </div>
       </main>
-      <PublicFooter />
+      <PublicFooter showroom={showroom} contacts={contacts} />
     </div>
   );
 }

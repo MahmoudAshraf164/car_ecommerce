@@ -146,7 +146,7 @@ export function CarCard({ car }: CarCardProps) {
                 السعر الحالي
               </span>
               <div className="text-xl font-black text-[#121316] font-mono tracking-tight">
-                {car.price.toLocaleString("ar-EG")}
+                {car.price.toLocaleString("en-US")}
                 <span className="text-xs font-bold text-[#46464b] mr-1">ج.م</span>
               </div>
             </div>

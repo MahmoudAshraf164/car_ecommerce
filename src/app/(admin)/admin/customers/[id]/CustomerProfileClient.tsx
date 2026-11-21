@@ -17,7 +17,9 @@ import {
 import Link from "next/link";
 
 export default function CustomerProfileClient({ customer }: { customer: any }) {
-  const [activeTab, setActiveTab] = useState<"deals" | "notes">("deals");
+  const [activeTab, setActiveTab] = useState<"deals" | "installments" | "notes">("deals");
+
+  const installments = customer.installments || [];
 
   // Format leads for display
   const deals = (customer.leads || []).map((lead: any) => {
@@ -168,6 +170,18 @@ export default function CustomerProfileClient({ customer }: { customer: any }) {
         </button>
 
         <button
+          onClick={() => setActiveTab("installments")}
+          className={`flex items-center gap-2 px-4 py-3 rounded-t-xl font-bold text-sm transition-all ${
+            activeTab === "installments"
+              ? "bg-white border-x border-t border-slate-200/80 text-amber-600 border-b-2 border-b-white -mb-px shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>الأقساط والعقود ({installments.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("notes")}
           className={`flex items-center gap-2 px-4 py-3 rounded-t-xl font-bold text-sm transition-all ${
             activeTab === "notes"
@@ -225,6 +239,151 @@ export default function CustomerProfileClient({ customer }: { customer: any }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {activeTab === "installments" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base">
+                عقود الأقساط ({installments.length})
+              </h3>
+              <Link
+                href="/admin/installments"
+                className="text-xs font-bold text-amber-600 hover:text-amber-700"
+              >
+                إدارة وسداد الأقساط ←
+              </Link>
+            </div>
+
+            {installments.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm">
+                لا توجد عقود أقساط مسجلة لهذا العميل حتى الآن
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {installments.map((inst: any) => {
+                  const remainingCount = Math.max(
+                    inst.total_installments - inst.paid_installments,
+                    0
+                  );
+                  const remainingBal = Math.max(
+                    inst.total_amount - inst.paid_amount,
+                    0
+                  );
+                  const isDone = inst.status === "completed";
+
+                  return (
+                    <div
+                      key={inst.id}
+                      className="p-5 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-sm">
+                            {inst.contract_title}
+                          </h4>
+                          {inst.car?.title && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              🚗 السيارة: {inst.car.title}
+                            </p>
+                          )}
+                        </div>
+
+                        <span
+                          className={`text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto ${
+                            isDone
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {isDone ? "مكتمل ومسدد بالكامل ✓" : "عقد نشط ومستمر"}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block mb-1">
+                            القسط الشهري
+                          </span>
+                          <span className="font-black text-slate-900 font-mono text-sm">
+                            {new Intl.NumberFormat("en-US").format(
+                              inst.monthly_amount
+                            )}{" "}
+                            ج.م
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block mb-1">
+                            المدفوع حتى الآن
+                          </span>
+                          <span className="font-black text-emerald-700 font-mono text-sm">
+                            {new Intl.NumberFormat("en-US").format(
+                              inst.paid_amount
+                            )}{" "}
+                            ج.م
+                          </span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            ({inst.paid_installments} من {inst.total_installments} قسط)
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block mb-1">
+                            المتبقي من العقد
+                          </span>
+                          <span className="font-black text-amber-700 font-mono text-sm">
+                            {new Intl.NumberFormat("en-US").format(remainingBal)}{" "}
+                            ج.م
+                          </span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            ({remainingCount} قسط متبقي)
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80">
+                          <span className="text-slate-400 block mb-1">
+                            الاستحقاق القادم
+                          </span>
+                          <span className="font-black text-slate-900 font-mono text-xs">
+                            {inst.next_due_date}
+                          </span>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">
+                            يوم {inst.due_day_of_month} بالشهر
+                          </span>
+                        </div>
+                      </div>
+
+                      {inst.installment_payments &&
+                        inst.installment_payments.length > 0 && (
+                          <div className="border-t border-slate-200/60 pt-3">
+                            <span className="text-xs font-bold text-slate-700 block mb-2">
+                              آخر الدفعات المسجلة:
+                            </span>
+                            <div className="space-y-1.5">
+                              {inst.installment_payments.slice(0, 3).map((p: any) => (
+                                <div
+                                  key={p.id}
+                                  className="flex items-center justify-between text-xs bg-white px-3 py-2 rounded-lg border border-slate-100 font-mono"
+                                >
+                                  <span className="text-slate-700">
+                                    دفعة {new Intl.NumberFormat("en-US").format(p.amount)} ج.م (
+                                    {p.payment_method})
+                                  </span>
+                                  <span className="text-slate-400">
+                                    {p.payment_date}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

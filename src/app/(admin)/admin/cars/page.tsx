@@ -7,12 +7,14 @@ interface AdminCarsPageProps {
     brand_id?: string;
     status?: string;
     page?: string;
+    limit?: string;
   }>;
 }
 
 export default async function AdminCarsPage({ searchParams }: AdminCarsPageProps) {
   const resolvedParams = await searchParams;
   const page = parseInt(resolvedParams.page || "1", 10);
+  const limit = parseInt(resolvedParams.limit || "10", 10);
 
   const [{ data: cars, total, totalPages }, { brands }] = await Promise.all([
     getCars({
@@ -20,7 +22,7 @@ export default async function AdminCarsPage({ searchParams }: AdminCarsPageProps
       brand_id: resolvedParams.brand_id,
       status: resolvedParams.status as any,
       page,
-      limit: 15,
+      limit,
     }),
     getBrandsAndModels(),
   ]);
@@ -33,6 +35,7 @@ export default async function AdminCarsPage({ searchParams }: AdminCarsPageProps
           brands={brands}
           total={total}
           page={page}
+          pageSize={limit}
           totalPages={totalPages}
           currentFilters={resolvedParams}
         />

@@ -47,7 +47,7 @@ export default function PublicContactPage() {
                 <Phone className="w-5 h-5 text-[#c5a059] shrink-0" />
                 <div>
                   <span className="font-bold block text-white">الهاتف المباشر:</span>
-                  <span className="text-slate-300 font-mono">+20 100 000 0000</span>
+                  <span className="text-slate-300 font-mono">+201007946824</span>
                 </div>
               </div>
 
@@ -91,7 +91,7 @@ export default function PublicContactPage() {
                   <input
                     type="tel"
                     required
-                    placeholder="+20 100 000 0000"
+                    placeholder="+201007946824"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 font-mono"
@@ -143,13 +143,13 @@ export default function PublicContactPage() {
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <a href="tel:+201000000000" className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+          <a href="tel:+201007946824" className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-[#c5a059]"><Phone className="h-5 w-5" /></div>
             <h2 className="font-black text-slate-900">اتصل مباشرة</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">للاستفسارات العاجلة أو ترتيب معاينة خاصة.</p>
-            <span className="mt-4 inline-block text-sm font-bold text-[#a27d27] group-hover:text-slate-900">+20 100 000 0000</span>
+            <span className="mt-4 inline-block text-sm font-bold text-[#a27d27] group-hover:text-slate-900">+20 100 794 6824</span>
           </a>
-          <a href="https://wa.me/201000000000" target="_blank" rel="noreferrer" className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+          <a href="https://wa.me/201007946824" target="_blank" rel="noreferrer" className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-[#c5a059]"><MessageSquare className="h-5 w-5" /></div>
             <h2 className="font-black text-slate-900">راسلنا على واتساب</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">تواصل سريع مع فريق خدمة العملاء والكونسيرج.</p>

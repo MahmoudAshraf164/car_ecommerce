@@ -41,11 +41,10 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                  ? "bg-primary text-on-primary font-bold shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50"
+                  }`}
               >
                 {link.label}
               </Link>

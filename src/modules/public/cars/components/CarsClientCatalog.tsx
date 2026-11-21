@@ -1,25 +1,144 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useCallback, useEffect, useTransition } from "react";
 import Link from "next/link";
-import { Search, Heart, ChevronLeft, Lock, Unlock } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Search, Filter, RotateCcw, Lock, Heart, ChevronLeft, X } from "lucide-react";
+import { AdminPagination } from "@/modules/admin/components/AdminPagination";
 import type { CarWithRelations } from "@/modules/admin/cars/types/car.types";
 
 interface BrandOption {
   id: string;
   name: string;
+  car_models?: { id: string; name: string }[];
 }
 
 interface CarsClientCatalogProps {
   initialCars: CarWithRelations[];
   totalCount: number;
   brands: BrandOption[];
+  currentPage?: number;
+  pageSize?: number;
 }
 
-export function CarsClientCatalog({ initialCars, totalCount, brands }: CarsClientCatalogProps) {
-  const [search, setSearch] = useState("");
-  const [selectedBrandId, setSelectedBrandId] = useState("all");
-  const [selectedCondition, setSelectedCondition] = useState("all");
+const BODY_TYPE_OPTIONS = [
+  { value: "", label: "جميع الأنواع" },
+  { value: "sedan", label: "سيدان" },
+  { value: "suv", label: "SUV" },
+  { value: "hatchback", label: "هاتشباك" },
+  { value: "coupe", label: "كوبيه" },
+  { value: "convertible", label: "مكشوفة" },
+  { value: "van", label: "فان" },
+  { value: "truck", label: "بيك أب / شاحنة" },
+  { value: "crossover", label: "كروس أوفر" },
+  { value: "other", label: "أخرى" },
+];
+
+const TRANSMISSION_OPTIONS = [
+  { value: "", label: "جميع ناقلات الحركة" },
+  { value: "automatic", label: "أوتوماتيك" },
+  { value: "manual", label: "يدوي (مانيوال)" },
+  { value: "cvt", label: "CVT" },
+  { value: "dual_clutch", label: "دبل كلتش" },
+];
+
+const FUEL_OPTIONS = [
+  { value: "", label: "جميع أنواع الوقود" },
+  { value: "petrol", label: "بنزين" },
+  { value: "diesel", label: "ديزل" },
+  { value: "electric", label: "كهربائي" },
+  { value: "hybrid", label: "هايبرد" },
+  { value: "plugin_hybrid", label: "هايبرد مدمج (Plug-in)" },
+  { value: "gas", label: "غاز" },
+];
+
+const DRIVE_OPTIONS = [
+  { value: "", label: "جميع أنواع الدفع" },
+  { value: "fwd", label: "دفع أمامي (FWD)" },
+  { value: "rwd", label: "دفع خلفي (RWD)" },
+  { value: "awd", label: "دفع رباعي (AWD)" },
+  { value: "4wd", label: "دفع 4×4 (4WD)" },
+];
+
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS: { value: string; label: string }[] = [{ value: "", label: "جميع السنوات" }];
+for (let y = currentYear + 1; y >= 2010; y--) {
+  YEAR_OPTIONS.push({ value: String(y), label: String(y) });
+}
+
+const TRANSMISSION_LABELS: Record<string, string> = {
+  automatic: "أوتوماتيك",
+  manual: "يدوي",
+  cvt: "CVT",
+  dual_clutch: "دبل كلتش",
+};
+
+const FUEL_LABELS: Record<string, string> = {
+  petrol: "بنزين",
+  diesel: "ديزل",
+  electric: "كهربائي",
+  hybrid: "هايبرد",
+  plugin_hybrid: "هايبرد مدمج",
+  gas: "غاز",
+};
+
+const BODY_LABELS: Record<string, string> = {
+  sedan: "سيدان",
+  suv: "SUV",
+  hatchback: "هاتشباك",
+  coupe: "كوبيه",
+  convertible: "مكشوفة",
+  van: "فان",
+  truck: "بيك أب",
+  crossover: "كروس أوفر",
+  other: "أخرى",
+};
+
+function useUrlFilters() {
+  const searchParams = useSearchParams();
+  return {
+    search: searchParams.get("search") ?? "",
+    brand_id: searchParams.get("brand_id") ?? "",
+    model_id: searchParams.get("model_id") ?? "",
+    body_type: searchParams.get("body_type") ?? "",
+    year: searchParams.get("year") ?? "",
+    condition: searchParams.get("condition") ?? "",
+    transmission: searchParams.get("transmission") ?? "",
+    fuel_type: searchParams.get("fuel_type") ?? "",
+    drive_type: searchParams.get("drive_type") ?? "",
+  };
+}
+
+function getCarImage(car: CarWithRelations): string {
+  const imgs = (car as any).car_images;
+  if (imgs && imgs.length > 0) {
+    const primary = imgs.find((i: any) => i.is_primary) || imgs[0];
+    return primary.image_url || primary.url || "";
+  }
+  return "";
+}
+
+export function CarsClientCatalog({
+  initialCars,
+  totalCount,
+  brands,
+  currentPage = 1,
+  pageSize = 12,
+}: CarsClientCatalogProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const urlFilters = useUrlFilters();
+
+  const [search, setSearch] = useState(urlFilters.search);
+  const [selectedBrand, setSelectedBrand] = useState(urlFilters.brand_id);
+  const [selectedModel, setSelectedModel] = useState(urlFilters.model_id);
+  const [selectedBodyType, setSelectedBodyType] = useState(urlFilters.body_type);
+  const [selectedYear, setSelectedYear] = useState(urlFilters.year);
+  const [selectedCondition, setSelectedCondition] = useState(urlFilters.condition);
+  const [selectedTransmission, setSelectedTransmission] = useState(urlFilters.transmission);
+  const [selectedFuelType, setSelectedFuelType] = useState(urlFilters.fuel_type);
+  const [selectedDriveType, setSelectedDriveType] = useState(urlFilters.drive_type);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [unlockedCars, setUnlockedCars] = useState<string[]>([]);
 
@@ -27,244 +146,480 @@ export function CarsClientCatalog({ initialCars, totalCount, brands }: CarsClien
     try {
       const ids = JSON.parse(localStorage.getItem("unlocked_cars") || "[]");
       setUnlockedCars(ids);
-    } catch (err) {}
+    } catch {}
   }, []);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+  const availableModels =
+    brands.find((b) => b.id === selectedBrand)?.car_models ?? [];
+
+  const hasActiveFilters = !!(
+    search || selectedBrand || selectedModel || selectedBodyType ||
+    selectedYear || selectedCondition || selectedTransmission ||
+    selectedFuelType || selectedDriveType
+  );
+
+  const applyFilters = useCallback((overrideParams?: Record<string, string>) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (selectedBrand) params.set("brand_id", selectedBrand);
+    if (selectedModel) params.set("model_id", selectedModel);
+    if (selectedBodyType) params.set("body_type", selectedBodyType);
+    if (selectedYear) params.set("year", selectedYear);
+    if (selectedCondition) params.set("condition", selectedCondition);
+    if (selectedTransmission) params.set("transmission", selectedTransmission);
+    if (selectedFuelType) params.set("fuel_type", selectedFuelType);
+    if (selectedDriveType) params.set("drive_type", selectedDriveType);
+
+    if (overrideParams) {
+      Object.entries(overrideParams).forEach(([k, v]) => {
+        if (v) params.set(k, v);
+        else params.delete(k);
+      });
+    }
+
+    startTransition(() => {
+      router.push(`/cars${params.toString() ? "?" + params.toString() : ""}`);
+      setMobileFiltersOpen(false);
+    });
+  }, [
+    search, selectedBrand, selectedModel, selectedBodyType, selectedYear,
+    selectedCondition, selectedTransmission, selectedFuelType, selectedDriveType, router,
+  ]);
+
+  const resetFilters = () => {
+    setSearch(""); setSelectedBrand(""); setSelectedModel(""); setSelectedBodyType("");
+    setSelectedYear(""); setSelectedCondition(""); setSelectedTransmission("");
+    setSelectedFuelType(""); setSelectedDriveType("");
+    startTransition(() => router.push("/cars"));
   };
 
-  const filteredCars = useMemo(() => {
-    return initialCars.filter((car) => {
-      const searchLower = search.toLowerCase();
-      const matchesSearch =
-        !search ||
-        car.title.toLowerCase().includes(searchLower) ||
-        car.brand?.name?.toLowerCase().includes(searchLower) ||
-        car.car_models?.name?.toLowerCase().includes(searchLower);
+  const handleBrandChange = (val: string) => {
+    setSelectedBrand(val);
+    setSelectedModel("");
+  };
 
-      const matchesBrand =
-        selectedBrandId === "all" || car.brand_id === selectedBrandId;
-      const matchesCondition =
-        selectedCondition === "all" || car.condition === selectedCondition;
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
 
-      return matchesSearch && matchesBrand && matchesCondition;
-    });
-  }, [initialCars, search, selectedBrandId, selectedCondition]);
+  const selectClass = "w-full bg-white border border-[#E5E7EB] rounded-xl px-3 py-2.5 text-sm text-[#121316] focus:outline-none focus:border-[#c5a059] focus:ring-1 focus:ring-[#c5a059]/30 transition-all";
+
+  const FilterContent = (
+    <form
+      onSubmit={(e) => { e.preventDefault(); applyFilters(); }}
+      className="space-y-4"
+    >
+      {/* Search */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">البحث النصي</label>
+        <div className="relative">
+          <Search className="absolute right-3 top-3 w-4 h-4 text-[#76777b]" />
+          <input
+            type="text"
+            placeholder="اسم السيارة، الماركة، الموديل..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-white border border-[#E5E7EB] rounded-xl pr-9 pl-3 py-2.5 text-sm text-[#121316] placeholder:text-[#76777b] focus:outline-none focus:border-[#c5a059] focus:ring-1 focus:ring-[#c5a059]/30 transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Brand */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">الماركة</label>
+        <select value={selectedBrand} onChange={(e) => handleBrandChange(e.target.value)} className={selectClass}>
+          <option value="">جميع الماركات</option>
+          {brands.map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Model — only shown when brand selected */}
+      {selectedBrand && availableModels.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">الموديل</label>
+          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className={selectClass}>
+            <option value="">جميع الموديلات</option>
+            {availableModels.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <hr className="border-[#E5E7EB]" />
+
+      {/* Condition */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">حالة السيارة</label>
+        <div className="flex gap-2">
+          {[{ value: "", label: "الكل" }, { value: "new", label: "زيرو" }, { value: "used", label: "مستعمل" }].map((opt) => (
+            <button key={opt.value} type="button" onClick={() => setSelectedCondition(opt.value)}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
+                selectedCondition === opt.value
+                  ? "bg-[#121316] text-white border-[#121316]"
+                  : "bg-white text-[#46464b] border-[#E5E7EB] hover:border-[#121316]"
+              }`}
+            >{opt.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Body Type */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">نوع الهيكل</label>
+        <select value={selectedBodyType} onChange={(e) => setSelectedBodyType(e.target.value)} className={selectClass}>
+          {BODY_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* Year */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">سنة الصنع</label>
+        <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className={selectClass}>
+          {YEAR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      <hr className="border-[#E5E7EB]" />
+
+      {/* Transmission */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">ناقل الحركة</label>
+        <select value={selectedTransmission} onChange={(e) => setSelectedTransmission(e.target.value)} className={selectClass}>
+          {TRANSMISSION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* Fuel Type */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">نوع الوقود</label>
+        <select value={selectedFuelType} onChange={(e) => setSelectedFuelType(e.target.value)} className={selectClass}>
+          {FUEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      {/* Drive Type */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-black text-[#121316] uppercase tracking-wider">نوع الدفع</label>
+        <select value={selectedDriveType} onChange={(e) => setSelectedDriveType(e.target.value)} className={selectClass}>
+          {DRIVE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+
+      <hr className="border-[#E5E7EB]" />
+
+      {/* Actions */}
+      <button
+        type="submit"
+        disabled={isPending}
+        className="w-full py-3 rounded-xl bg-[#121316] hover:bg-[#1e1f23] text-white font-black text-sm transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+      >
+        <Search className="w-4 h-4" />
+        {isPending ? "جاري التصفية..." : "تطبيق الفلاتر"}
+      </button>
+
+      {hasActiveFilters && (
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="w-full py-2.5 rounded-xl border border-[#E5E7EB] text-[#76777b] hover:text-[#121316] hover:border-[#121316] font-bold text-sm transition-all flex items-center justify-center gap-2"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          إعادة ضبط الفلاتر
+        </button>
+      )}
+    </form>
+  );
 
   return (
-    <>
-      {/* ── Advanced Search & Filter Bar ──────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-md space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {/* Search Input */}
-            <div className="relative sm:col-span-2">
-              <Search className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="ابحث بالماركة، الموديل، أو عنوان السيارة..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-10 pl-4 py-3 text-sm text-slate-900 focus:outline-none focus:border-[#c5a059]"
-              />
-            </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16" dir="rtl">
+      {/* Mobile Filter Toggle */}
+      <div className="lg:hidden mb-4 flex items-center justify-between">
+        <span className="text-sm text-[#46464b] font-bold">
+          {totalCount} سيارة متاحة
+        </span>
+        <button
+          onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#E5E7EB] text-sm font-bold text-[#121316] shadow-sm"
+        >
+          <Filter className="w-4 h-4" />
+          الفلاتر
+          {hasActiveFilters && (
+            <span className="w-5 h-5 rounded-full bg-[#121316] text-white text-[10px] font-black flex items-center justify-center">
+              !
+            </span>
+          )}
+        </button>
+      </div>
 
-            {/* Brand Filter */}
-            <div>
-              <select
-                value={selectedBrandId}
-                onChange={(e) => setSelectedBrandId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:border-[#c5a059]"
-              >
-                <option value="all">جميع الماركات العالمية</option>
-                {brands.map((brand) => (
-                  <option key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </option>
-                ))}
-              </select>
+      {/* Mobile Filters Drawer */}
+      {mobileFiltersOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setMobileFiltersOpen(false)}>
+          <div
+            className="absolute right-0 top-0 h-full w-80 bg-white overflow-y-auto p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <span className="font-black text-[#121316] text-base">فلترة السيارات</span>
+              <button onClick={() => setMobileFiltersOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100">
+                <X className="w-5 h-5 text-[#46464b]" />
+              </button>
             </div>
-
-            {/* Condition Filter */}
-            <div>
-              <select
-                value={selectedCondition}
-                onChange={(e) => setSelectedCondition(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:border-[#c5a059]"
-              >
-                <option value="all">جميع الحالات</option>
-                <option value="new">جديدة تماماً (زيرو)</option>
-                <option value="used">مستعملة معتمدة</option>
-              </select>
-            </div>
+            {FilterContent}
           </div>
         </div>
-      </section>
+      )}
 
-      {/* ── Cars Grid Section ─────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-          <span className="text-xs font-bold text-slate-500">
-            تم العثور على{" "}
-            <span className="font-extrabold text-slate-900 text-sm">
-              {filteredCars.length}
-            </span>{" "}
-            سيارة فاخرة
-          </span>
-        </div>
-
-        {filteredCars.length === 0 ? (
-          <div className="text-center py-16 space-y-3">
-            <div className="text-5xl">🏎️</div>
-            <h3 className="text-lg font-bold text-slate-700">
-              لا توجد سيارات تطابق بحثك
-            </h3>
-            <p className="text-sm text-slate-500">
-              جرب تعديل معايير البحث أو تصفح جميع السيارات
-            </p>
-            <button
-              onClick={() => {
-                setSearch("");
-                setSelectedBrandId("all");
-                setSelectedCondition("all");
-              }}
-              className="px-6 py-2.5 bg-[#c5a059] text-white font-bold text-sm rounded-xl hover:bg-[#b08d48] transition-colors"
-            >
-              مسح الفلاتر
-            </button>
+      <div className="flex gap-6">
+        {/* Desktop Sidebar Filters */}
+        <aside className="hidden lg:block w-64 shrink-0">
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-sm sticky top-28">
+            <div className="flex items-center justify-between mb-5">
+              <span className="font-black text-[#121316] text-sm flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                فلترة النتائج
+              </span>
+              {hasActiveFilters && (
+                <button onClick={resetFilters} className="text-[10px] text-[#76777b] hover:text-[#121316] flex items-center gap-1 font-bold">
+                  <RotateCcw className="w-3 h-3" />
+                  مسح
+                </button>
+              )}
+            </div>
+            {FilterContent}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
-            {filteredCars.map((car) => {
-              const isFav = favorites.includes(car.id);
-              const primaryImage =
-                car.car_images?.find((img) => img.is_primary)?.image_url ||
-                car.car_images?.[0]?.image_url ||
-                null;
+        </aside>
 
-              return (
-                <div
-                  key={car.id}
-                  className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-sm hover:shadow-xl transition-all group flex flex-col justify-between"
-                >
-                  <div>
-                    {/* Image Container */}
-                    <div className="relative h-56 w-full bg-slate-100 overflow-hidden">
-                      {primaryImage ? (
+        {/* Cars Grid */}
+        <main className="flex-1 min-w-0">
+          {/* Results header */}
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <span className="text-sm font-black text-[#121316]">{totalCount} سيارة</span>
+              <span className="text-xs text-[#76777b] mr-1.5">متاحة في الأسطول</span>
+            </div>
+            {isPending && (
+              <span className="text-xs text-[#c5a059] font-bold animate-pulse">جاري التحديث...</span>
+            )}
+          </div>
+
+          {/* Active Filter Chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {selectedCondition && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#121316] text-white text-xs font-bold">
+                  {selectedCondition === "new" ? "زيرو" : "مستعمل"}
+                  <button onClick={() => setSelectedCondition("")} className="hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedBodyType && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-[#121316] text-xs font-bold">
+                  {BODY_LABELS[selectedBodyType] || selectedBodyType}
+                  <button onClick={() => setSelectedBodyType("")} className="hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedYear && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-[#121316] text-xs font-bold">
+                  {selectedYear}
+                  <button onClick={() => setSelectedYear("")} className="hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedTransmission && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-[#121316] text-xs font-bold">
+                  {TRANSMISSION_LABELS[selectedTransmission] || selectedTransmission}
+                  <button onClick={() => setSelectedTransmission("")} className="hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {selectedFuelType && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-[#121316] text-xs font-bold">
+                  {FUEL_LABELS[selectedFuelType] || selectedFuelType}
+                  <button onClick={() => setSelectedFuelType("")} className="hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {initialCars.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-[#E5E7EB]">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <Search className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="font-black text-[#121316] text-lg mb-2">لا توجد سيارات مطابقة</h3>
+              <p className="text-sm text-[#76777b] mb-6">جرب تعديل الفلاتر للحصول على نتائج أوسع</p>
+              <button
+                onClick={resetFilters}
+                className="px-6 py-2.5 rounded-xl bg-[#121316] text-white font-bold text-sm flex items-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                إعادة ضبط الفلاتر
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {initialCars.map((car) => {
+                const imageUrl = getCarImage(car);
+                const isFav = favorites.includes(car.id);
+                const isUnlocked = unlockedCars.includes(car.id);
+                const brandName = (car as any).brand?.name || "";
+                const modelName = (car as any).car_models?.name || "";
+
+                return (
+                  <div
+                    key={car.id}
+                    className="group bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-sm hover:shadow-lg hover:border-[#c5a059]/30 transition-all duration-200"
+                  >
+                    {/* Image */}
+                    <div className="relative h-52 bg-slate-100 overflow-hidden">
+                      {imageUrl ? (
                         <img
-                          src={primaryImage}
+                          src={imageUrl}
                           alt={car.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                          <span className="text-4xl opacity-30">🚗</span>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-4xl opacity-20">🚗</span>
                         </div>
                       )}
 
-                      {/* Status Badges */}
+                      {/* Badges */}
                       <div className="absolute top-3 right-3 flex flex-col gap-1.5">
-                        <span className="text-[10px] font-black text-[#c5a059] bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-md border border-[#c5a059]/40">
-                          {car.status === "available" ? "متاح ⚡" : car.status === "reserved" ? "محجوز" : "مباع"}
-                        </span>
-                        {car.featured && (
-                          <span className="text-[10px] font-black text-emerald-400 bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-md border border-emerald-500/40">
-                            إصدار خاص VIP
+                        {car.condition === "new" && (
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-black">
+                            زيرو
+                          </span>
+                        )}
+                        {(car as any).featured && (
+                          <span className="px-2.5 py-1 rounded-full bg-[#c5a059] text-slate-950 text-[10px] font-black">
+                            مميز ⭐
+                          </span>
+                        )}
+                        {car.status === "reserved" && (
+                          <span className="px-2.5 py-1 rounded-full bg-orange-500 text-white text-[10px] font-black">
+                            محجوزة
                           </span>
                         )}
                       </div>
 
-                      {/* Favorite Heart Button */}
+                      {/* Favorite */}
                       <button
                         onClick={() => toggleFavorite(car.id)}
-                        className={`absolute top-3 left-3 p-2 rounded-full backdrop-blur-md transition-colors ${
-                          isFav
-                            ? "bg-rose-500 text-white"
-                            : "bg-slate-950/50 text-white hover:bg-slate-950/80"
-                        }`}
+                        className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm hover:scale-110 transition-transform"
                       >
-                        <Heart className={`w-4 h-4 ${isFav ? "fill-white" : ""}`} />
+                        <Heart
+                          className={`w-4 h-4 ${isFav ? "fill-red-500 text-red-500" : "text-slate-400"}`}
+                        />
                       </button>
                     </div>
 
-                    {/* Card Content */}
-                    <div className="p-5 space-y-3">
-                      <div className="flex items-center justify-between text-xs text-slate-400">
-                        <span className="font-bold text-amber-700">
-                          {car.brand?.name || "—"}
-                        </span>
-                        <span className="font-mono">{car.year}</span>
+                    {/* Content */}
+                    <div className="p-4">
+                      {/* Brand / Model row */}
+                      <div className="flex items-center gap-2 mb-1">
+                        {brandName && (
+                          <span className="text-[10px] font-black text-[#c5a059] bg-[#c5a059]/10 px-2 py-0.5 rounded border border-[#c5a059]/20">
+                            {brandName}
+                          </span>
+                        )}
+                        {modelName && (
+                          <span className="text-[10px] text-[#76777b] font-bold">{modelName}</span>
+                        )}
                       </div>
 
-                      <h3 className="font-extrabold text-slate-900 text-base leading-snug line-clamp-1">
+                      <h3 className="font-black text-[#121316] text-sm leading-snug mb-2 line-clamp-2">
                         {car.title}
                       </h3>
 
-                      {/* Key Specs Pills */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                          {car.condition === "new" ? "زيرو" : "مستعمل معتمد"}
-                        </span>
-                        {car.transmission && (
-                          <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            {car.transmission === "automatic" ? "أوتوماتيك" : "يدوي"}
+                      {/* Specs */}
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3">
+                        {car.year && (
+                          <span className="text-[11px] text-[#46464b] flex items-center gap-1">
+                            <span className="text-[#c5a059]">📅</span> {car.year}
                           </span>
                         )}
-                        {car.fuel_type && (
-                          <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            {car.fuel_type === "petrol" ? "بنزين" : car.fuel_type === "electric" ? "كهربائي" : car.fuel_type === "hybrid" ? "هايبرد" : car.fuel_type}
+                        {(car as any).transmission && (
+                          <span className="text-[11px] text-[#46464b] flex items-center gap-1">
+                            <span className="text-[#c5a059]">⚙️</span>
+                            {TRANSMISSION_LABELS[(car as any).transmission] || (car as any).transmission}
+                          </span>
+                        )}
+                        {(car as any).fuel_type && (
+                          <span className="text-[11px] text-[#46464b] flex items-center gap-1">
+                            <span className="text-[#c5a059]">⛽</span>
+                            {FUEL_LABELS[(car as any).fuel_type] || (car as any).fuel_type}
+                          </span>
+                        )}
+                        {(car as any).mileage != null && (
+                          <span className="text-[11px] text-[#46464b] flex items-center gap-1">
+                            <span className="text-[#c5a059]">🛣️</span>
+                            {Number((car as any).mileage).toLocaleString("en-US")} كم
                           </span>
                         )}
                       </div>
+
+                      {/* Price / CTA */}
+                      <div className="pt-3 border-t border-[#F3F4F6] flex items-center justify-between gap-2">
+                        <div>
+                          {isUnlocked && (car as any).price ? (
+                            <div>
+                              <p className="text-[10px] text-[#76777b]">السعر</p>
+                              <p className="font-black text-[#121316] text-base">
+                                {Number((car as any).price).toLocaleString("en-US")}
+                                <span className="text-xs font-bold text-[#76777b] mr-1">ج.م</span>
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <Lock className="w-3.5 h-3.5 text-[#c5a059]" />
+                              <span className="text-xs text-[#76777b] font-bold">السعر عند المعاينة</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <Link
+                          href={`/cars/${car.slug || car.id}`}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#121316] hover:bg-[#1e1f23] text-white text-xs font-black transition-all shrink-0"
+                        >
+                          <span>التفاصيل</span>
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
 
-                  {/* Footer Price & CTA */}
-                  <div className="p-5 pt-0 space-y-3">
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                      {unlockedCars.includes(car.id) ? (
-                        <div>
-                          <span className="text-[10px] font-bold text-emerald-600 block flex items-center gap-1">
-                            <Unlock className="w-3 h-3" />
-                            السعر الحالي:
-                          </span>
-                          <span className="font-mono font-black text-slate-900 text-lg">
-                            {car.price.toLocaleString("ar-EG")}
-                          </span>
-                          <span className="mr-1 text-xs font-bold text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
-                            ج.م
-                          </span>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="text-[10px] font-bold text-slate-400 block mb-0.5">
-                            السعر:
-                          </span>
-                          <span className="inline-flex items-center gap-1 font-bold text-amber-600 text-sm bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                            <Lock className="w-3.5 h-3.5" />
-                            عند الاستفسار
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <Link
-                      href={`/cars/${car.id}`}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#111215] hover:bg-[#1C1D22] text-white font-extrabold text-xs transition-all shadow-md"
-                    >
-                      <span>{unlockedCars.includes(car.id) ? "عرض التفاصيل الكاملة" : "عرض التفاصيل ومعرفة السعر"}</span>
-                      <ChevronLeft className="w-4 h-4 text-[#c5a059]" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Pagination */}
+          <div className="mt-8">
+            <AdminPagination
+              currentPage={currentPage}
+              totalPages={Math.max(1, Math.ceil(totalCount / pageSize))}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={(p) => {
+                applyFilters({ page: String(p) });
+                window.scrollTo({ top: 400, behavior: "smooth" });
+              }}
+              itemName="سيارة فاخرة"
+              className="bg-white border border-[#E5E7EB] rounded-2xl shadow-sm"
+            />
           </div>
-        )}
-      </section>
-    </>
+        </main>
+      </div>
+    </div>
   );
 }
