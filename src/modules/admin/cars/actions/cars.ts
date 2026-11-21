@@ -647,6 +647,10 @@ export async function createQuickBrandAndModel(brandName: string, modelName: str
   }
 }
 
+
+
+
+
 /**
  * Fetch brands and car models
  */

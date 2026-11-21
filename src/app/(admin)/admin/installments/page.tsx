@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { Suspense } from "react";
 import { getInstallments } from "@/modules/admin/installments/actions/installments";
 import { InstallmentsClient } from "@/modules/admin/installments/components/InstallmentsClient";

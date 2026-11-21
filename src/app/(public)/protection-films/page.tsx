@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { Suspense } from "react";
 import { Shield, Phone, MessageSquare, Star, Filter, Sparkles, Zap, Award } from "lucide-react";
 import { getProtectionFilms } from "@/modules/public/actions/protection-films";

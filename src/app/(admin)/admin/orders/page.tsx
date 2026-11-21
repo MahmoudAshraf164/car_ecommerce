@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { Suspense } from "react";
 import { getAdminLeads } from "@/modules/admin/dashboard/actions/leads";
 import { AdminOrdersClient } from "@/modules/admin/dashboard/components/AdminOrdersClient";

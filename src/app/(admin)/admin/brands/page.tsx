@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getBrandsAndModels } from "@/modules/admin/cars/actions/cars";
 import { BrandsManagementClient } from "@/modules/admin/brands/components/BrandsManagementClient";
 

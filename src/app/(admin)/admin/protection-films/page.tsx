@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getProtectionFilms } from "@/modules/public/actions/protection-films";
 import { ProtectionFilmsAdminClient } from "@/modules/admin/dashboard/components/ProtectionFilmsAdminClient";
 

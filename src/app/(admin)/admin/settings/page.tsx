@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getAdminSettingsData } from "@/modules/admin/dashboard/actions/settings";
 import { AdminSettingsClient } from "./AdminSettingsClient";
 

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { QuickSearch } from "@/modules/home/ui/QuickSearch";
 import {

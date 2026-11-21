@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { Suspense } from "react";
 import { getPublicCars, getBrandsWithModels } from "@/modules/public/actions/cars";
 import { CarsClientCatalog } from "@/modules/public/cars/components/CarsClientCatalog";

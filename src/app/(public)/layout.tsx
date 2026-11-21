@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { PublicHeader, PublicFooter } from "@/modules/public/components/HeaderFooter";
 import { getCompanySettings } from "@/modules/shared/lib/settings.server";
 
