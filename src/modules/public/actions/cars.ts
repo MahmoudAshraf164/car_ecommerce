@@ -12,6 +12,9 @@ export async function getCarByIdOrSlug(identifier: string): Promise<{
     let decodedId = identifier;
     try { decodedId = decodeURIComponent(identifier); } catch {}
 
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedId);
+
     const selectQuery = `
       *,
       brand:brands(*),
@@ -20,16 +23,22 @@ export async function getCarByIdOrSlug(identifier: string): Promise<{
       car_features(feature_id, features(*))
     `;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("cars")
       .select(selectQuery)
-      .is("deleted_at", null)
-      .or(`id.eq.${decodedId},slug.eq.${decodedId}`)
-      .single();
+      .is("deleted_at", null);
 
-    if (error) {
-      console.warn(`Notice fetching car ${identifier}:`, error.message);
-      return { data: null, error: error.message };
+    if (isUuid) {
+      query = query.eq("id", decodedId);
+    } else {
+      query = query.eq("slug", decodedId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error || !data) {
+      if (error) console.warn(`Notice fetching car ${identifier}:`, error.message);
+      return { data: null, error: error?.message || "السيارة غير موجودة" };
     }
 
     const formattedFeatures = (data.car_features || [])
