@@ -23,6 +23,7 @@ import {
   Palette,
   Settings2,
   Zap,
+  Layers,
   User,
   Phone,
   Lock,
@@ -435,8 +436,18 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
-                    {car.brand?.name || "—"} • {car.car_models?.name || "—"}
+                    {car.brand?.name || "—"}
                   </span>
+                  {(car as any).origin && (
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
+                      الصناعة: {(car as any).origin}
+                    </span>
+                  )}
+                  {(car as any).trim_level && (
+                    <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-black border border-amber-200/60">
+                      {(car as any).trim_level}
+                    </span>
+                  )}
                   <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200">
                     {conditionLabels[car.condition] || car.condition}
                   </span>
@@ -555,6 +566,20 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                 label="سنة الصنع"
                 value={String(car.year)}
               />
+              {(car as any).origin && (
+                <SpecCard
+                  icon={<Car />}
+                  label="الصناعة"
+                  value={(car as any).origin}
+                />
+              )}
+              {(car as any).trim_level && (
+                <SpecCard
+                  icon={<Layers />}
+                  label="الفئة"
+                  value={(car as any).trim_level}
+                />
+              )}
               <SpecCard
                 icon={<Gauge />}
                 label="المسافة المقطوعة"
@@ -582,11 +607,6 @@ export function CarDetailsView({ car }: CarDetailsViewProps) {
                     ? `${car.engine_capacity} سي سي`
                     : "غير محدد"
                 }
-              />
-              <SpecCard
-                icon={<Car />}
-                label="منظومة الدفع"
-                value={driveLabels[car.drive_type] || car.drive_type}
               />
               <SpecCard
                 icon={<ShieldCheck />}

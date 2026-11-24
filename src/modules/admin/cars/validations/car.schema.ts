@@ -20,10 +20,12 @@ export const carImageSchema = z.object({
 });
 
 export const carFormSchema = z.object({
-  title: z.string().min(3, "عنوان السيارة يجب أن يكون 3 حروف على الأقل"),
+  title: z.string().min(3, "اسم السيارة يجب أن يكون 3 حروف على الأقل"),
   slug: z.string().optional().or(z.literal("")),
   brand_id: z.string().min(1, "يرجى اختيار الماركة"),
-  model_id: z.string().min(1, "يرجى اختيار الموديل"),
+  model_id: z.string().optional().nullable().default(null),
+  origin: z.string().optional().nullable().default(""),
+  trim_level: z.string().optional().nullable().default(""),
   year: z.coerce
     .number()
     .min(1900, "السنة غير صالحة")
@@ -34,7 +36,7 @@ export const carFormSchema = z.object({
   condition: carConditionEnum.default("used"),
   transmission: transmissionTypeEnum.default("automatic"),
   fuel_type: fuelTypeEnum.default("petrol"),
-  drive_type: driveTypeEnum.default("fwd"),
+  drive_type: driveTypeEnum.optional().nullable().default("fwd"),
   body_type: bodyTypeEnum.default("sedan"),
   mileage: z.coerce
     .number()

@@ -70,15 +70,17 @@ export async function addCar(formData: any) {
 
     const title = formData.title || formData.get?.("title");
     const brand_id = formData.brand_id || formData.get?.("brand_id");
-    const model_id = formData.model_id || formData.get?.("model_id");
+    const model_id = formData.model_id || formData.get?.("model_id") || null;
+    const origin = formData.origin || formData.get?.("origin") || null;
+    const trim_level = formData.trim_level || formData.get?.("trim_level") || null;
     const year = Number(formData.year || formData.get?.("year") || 2024);
     const price = Number(formData.price || formData.get?.("price") || 0);
     const description = formData.description || formData.get?.("description") || null;
     const status = formData.status || formData.get?.("status") || "available";
     const images = formData.images || [];
 
-    if (!title || !brand_id || !model_id) {
-      return { success: false, error: "يرجى اختيار الماركة والموديل وإدخال عنوان السيارة" };
+    if (!title || !brand_id) {
+      return { success: false, error: "يرجى اختيار الماركة وإدخال اسم السيارة" };
     }
 
     const generatedSlug = `${slugify(title)}-${year}-${Date.now().toString().slice(-4)}`;
@@ -90,6 +92,8 @@ export async function addCar(formData: any) {
         slug: generatedSlug,
         brand_id,
         model_id,
+        origin,
+        trim_level,
         year,
         price,
         status,
@@ -295,9 +299,9 @@ export async function getCarBySlug(slug: string) {
   }
 }
 
-async function resolveBrandAndModel(supabase: any, brandInput: string, modelInput: string) {
+async function resolveBrandAndModel(supabase: any, brandInput: string, modelInput?: string) {
   let finalBrandId = brandInput;
-  let finalModelId = modelInput;
+  let finalModelId = modelInput || null;
 
   if (!brandInput) return { brand_id: brandInput, model_id: modelInput };
 
@@ -371,6 +375,8 @@ export async function createCar(formData: CarFormValues) {
     slug,
     brand_id,
     model_id,
+    origin,
+    trim_level,
     year,
     price,
     condition,
@@ -389,7 +395,7 @@ export async function createCar(formData: CarFormValues) {
   } = validated.data;
 
   // Resolve brand and model IDs (whether UUID or text strings)
-  const resolved = await resolveBrandAndModel(supabase, brand_id, model_id);
+  const resolved = await resolveBrandAndModel(supabase, brand_id, model_id || undefined);
 
   const generatedSlug =
     slug && slug.trim() !== ""
@@ -402,13 +408,15 @@ export async function createCar(formData: CarFormValues) {
       title,
       slug: generatedSlug,
       brand_id: resolved.brand_id,
-      model_id: resolved.model_id,
+      model_id: resolved.model_id || null,
+      origin: origin || null,
+      trim_level: trim_level || null,
       year,
       price,
       condition,
       transmission,
       fuel_type,
-      drive_type,
+      drive_type: drive_type || null,
       body_type,
       mileage,
       engine_capacity: engine_capacity || null,
@@ -465,6 +473,8 @@ export async function updateCar(id: string, formData: CarFormValues) {
     slug,
     brand_id,
     model_id,
+    origin,
+    trim_level,
     year,
     price,
     condition,
@@ -483,7 +493,7 @@ export async function updateCar(id: string, formData: CarFormValues) {
   } = validated.data;
 
   // Resolve brand and model IDs (whether UUID or text strings)
-  const resolved = await resolveBrandAndModel(supabase, brand_id, model_id);
+  const resolved = await resolveBrandAndModel(supabase, brand_id, model_id || undefined);
 
   const generatedSlug = slug && slug.trim() !== "" ? slugify(slug) : slugify(title);
 
@@ -493,13 +503,15 @@ export async function updateCar(id: string, formData: CarFormValues) {
       title,
       slug: generatedSlug,
       brand_id: resolved.brand_id,
-      model_id: resolved.model_id,
+      model_id: resolved.model_id || null,
+      origin: origin || null,
+      trim_level: trim_level || null,
       year,
       price,
       condition,
       transmission,
       fuel_type,
-      drive_type,
+      drive_type: drive_type || null,
       body_type,
       mileage,
       engine_capacity: engine_capacity || null,
@@ -658,20 +670,10 @@ export async function getBrandsAndModels() {
   try {
     const supabase = await createServerClient();
 
-    let { data: brands, error: brandsError } = await supabase
+    const { data: brands } = await supabase
       .from("brands")
       .select("*, car_models(*)")
       .order("name", { ascending: true });
-
-    if (brandsError || !brands || brands.length === 0) {
-      console.log("No brands found in database. Auto seeding default brands...");
-      await seedCarsData(false); // pass false so revalidatePath is NOT run during render
-      const { data: reFetched } = await supabase
-        .from("brands")
-        .select("*, car_models(*)")
-        .order("name", { ascending: true });
-      brands = reFetched || [];
-    }
 
     return { brands: brands || [], error: null };
   } catch (err) {
@@ -733,236 +735,6 @@ export async function submitCarInquiry(payload: {
     return { success: true, leadId: data };
   } catch (err: any) {
     return { success: false, error: err?.message || "فشل إرسال الطلب" };
-  }
-}
-
-/**
- * Seed Cars Sample Data Action
- */
-export async function seedCarsData(shouldRevalidate: boolean = true) {
-  try {
-    const supabase = await createServerClient();
-
-    // 1. Seed Brands
-    const brandData = [
-      { name: "مرسيدس-بنز (Mercedes-Benz)", vehicle_type: "car" },
-      { name: "بي إم دبليو (BMW)", vehicle_type: "car" },
-      { name: "بورش (Porsche)", vehicle_type: "car" },
-      { name: "رينج روفر (Range Rover)", vehicle_type: "car" },
-      { name: "أودي (Audi)", vehicle_type: "car" },
-      { name: "تويوتا (Toyota)", vehicle_type: "car" },
-    ];
-
-    const insertedBrands: Record<string, string> = {};
-
-    for (const b of brandData) {
-      const { data } = await supabase
-        .from("brands")
-        .upsert(b, { onConflict: "name" })
-        .select()
-        .single();
-      if (data) {
-        insertedBrands[b.name] = data.id;
-      }
-    }
-
-    // 2. Seed Models
-    const modelData = [
-      { brand_name: "مرسيدس-بنز (Mercedes-Benz)", name: "C200 AMG" },
-      { brand_name: "مرسيدس-بنز (Mercedes-Benz)", name: "S500 4MATIC" },
-      { brand_name: "بي إم دبليو (BMW)", name: "X5 xDrive40i" },
-      { brand_name: "بي إم دبليو (BMW)", name: "M4 Competition" },
-      { brand_name: "بورش (Porsche)", name: "911 Carrera S" },
-      { brand_name: "بورش (Porsche)", name: "Panamera GTS" },
-      { brand_name: "أودي (Audi)", name: "RS6 Avant" },
-      { brand_name: "تويوتا (Toyota)", name: "Land Cruiser VXR" },
-    ];
-
-    const insertedModels: Record<string, string> = {};
-
-    for (const m of modelData) {
-      const brandId = insertedBrands[m.brand_name];
-      if (brandId) {
-        const { data } = await supabase
-          .from("car_models")
-          .upsert({ brand_id: brandId, name: m.name }, { onConflict: "brand_id,name" })
-          .select()
-          .single();
-        if (data) {
-          insertedModels[`${m.brand_name}-${m.name}`] = data.id;
-        }
-      }
-    }
-
-    // 3. Seed Features
-    const sampleFeatures = [
-      { name: "نظام فرامل ABS المانع للانغلاق", category: "الأمان" },
-      { name: "فتحة سقف بانوراما برؤية كاملة", category: "الرفاهية" },
-      { name: "نظام ملاحة وتحديد مواقع شاشة GPS", category: "التكنولوجيا" },
-      { name: "نظام صوتي محيطي فاخر Burmester", category: "التكنولوجيا" },
-      { name: "مقاعد جلد طبيعي مع خاصية المساج والتدفئة", category: "الراحة" },
-      { name: "كاميرات رؤية محيطية 360 درجة", category: "الأمان" },
-      { name: "إضاءة داخلية خافته Ambient Light", category: "الرفاهية" },
-      { name: "حساسات ركن أمامية وخلفية الذكية", category: "الأمان" },
-    ];
-
-    for (const f of sampleFeatures) {
-      await supabase.from("features").upsert(f, { onConflict: "name" });
-    }
-
-    // 4. Sample Cars
-    const carsList = [
-      {
-        title: "مرسيدس C200 AMG موديل 2024 زيرو",
-        slug: "mercedes-c200-amg-2024",
-        brand_name: "مرسيدس-بنز (Mercedes-Benz)",
-        model_name: "C200 AMG",
-        year: 2024,
-        price: 3850000,
-        condition: "new",
-        transmission: "automatic",
-        fuel_type: "petrol",
-        drive_type: "rwd",
-        body_type: "sedan",
-        mileage: 0,
-        engine_capacity: 2000,
-        color: "أسود ميتاليك",
-        status: "available",
-        featured: true,
-        description: "سيارة مرسيدس C200 الفئة الأولى AMG بتجهيزات كاملة زيرو بدون استخدام مع ضمان الوكيل الفئة الفاخرة.",
-        images: [
-          "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?q=80&w=1200&auto=format&fit=crop",
-          "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?q=80&w=1200&auto=format&fit=crop",
-        ],
-      },
-      {
-        title: "بي إم دبليو X5 xDrive40i موديل 2023",
-        slug: "bmw-x5-xdrive40i-2023",
-        brand_name: "بي إم دبليو (BMW)",
-        model_name: "X5 xDrive40i",
-        year: 2023,
-        price: 5400000,
-        condition: "used",
-        transmission: "automatic",
-        fuel_type: "petrol",
-        drive_type: "awd",
-        body_type: "suv",
-        mileage: 18000,
-        engine_capacity: 3000,
-        color: "أبيض لؤلؤي",
-        status: "available",
-        featured: true,
-        description: "بي إم دبليو X5 بحالة الفابريكا بالكامل صيانات التوكيل بانتظام، فرش جلد جملي أنيق وحزمة M Sport.",
-        images: [
-          "https://images.unsplash.com/photo-1555215695-3004980ad54e?q=80&w=1200&auto=format&fit=crop",
-          "https://images.unsplash.com/photo-1556189250-72ba954cfc2b?q=80&w=1200&auto=format&fit=crop",
-        ],
-      },
-      {
-        title: "بورش 911 Carrera S موديل 2024",
-        slug: "porsche-911-carrera-s-2024",
-        brand_name: "بورش (Porsche)",
-        model_name: "911 Carrera S",
-        year: 2024,
-        price: 9800000,
-        condition: "new",
-        transmission: "dual_clutch",
-        fuel_type: "petrol",
-        drive_type: "rwd",
-        body_type: "coupe",
-        mileage: 500,
-        engine_capacity: 3000,
-        color: "أحمر بورش ريسنج",
-        status: "available",
-        featured: true,
-        description: "الأيقونة الألماني بورش 911 كاريرا S بتسارع استثنائي وباقة سبورت كرونو وشاسيه هيدروليكي رياضي.",
-        images: [
-          "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=1200&auto=format&fit=crop",
-          "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1200&auto=format&fit=crop",
-        ],
-      },
-      {
-        title: "تويوتا لاندكروزر VXR موديل 2024",
-        slug: "toyota-land-cruiser-vxr-2024",
-        brand_name: "تويوتا (Toyota)",
-        model_name: "Land Cruiser VXR",
-        year: 2024,
-        price: 6200000,
-        condition: "new",
-        transmission: "automatic",
-        fuel_type: "petrol",
-        drive_type: "4wd",
-        body_type: "suv",
-        mileage: 0,
-        engine_capacity: 3500,
-        color: "فضي ميتاليك",
-        status: "available",
-        featured: false,
-        description: "وحش الطرق الوعرة تويوتا لاندكروزر VXR المحرك المزدوج تيربو مع كامل التجهيزات الخليجية ومقاعد شاشات خلفية.",
-        images: [
-          "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=1200&auto=format&fit=crop",
-        ],
-      },
-    ];
-
-    for (const c of carsList) {
-      const brandId = insertedBrands[c.brand_name];
-      const modelId = insertedModels[`${c.brand_name}-${c.model_name}`];
-
-      if (brandId && modelId) {
-        const { data: newCar } = await supabase
-          .from("cars")
-          .upsert(
-            {
-              title: c.title,
-              slug: c.slug,
-              brand_id: brandId,
-              model_id: modelId,
-              year: c.year,
-              price: c.price,
-              condition: c.condition as any,
-              transmission: c.transmission as any,
-              fuel_type: c.fuel_type as any,
-              drive_type: c.drive_type as any,
-              body_type: c.body_type as any,
-              mileage: c.mileage,
-              engine_capacity: c.engine_capacity,
-              color: c.color,
-              status: c.status as any,
-              featured: c.featured,
-              description: c.description,
-            },
-            { onConflict: "slug" }
-          )
-          .select()
-          .single();
-
-        if (newCar && c.images) {
-          await supabase.from("car_images").delete().eq("car_id", newCar.id);
-          const imgInserts = c.images.map((url, i) => ({
-            car_id: newCar.id,
-            image_url: url,
-            display_order: i,
-            is_primary: i === 0,
-          }));
-          await supabase.from("car_images").insert(imgInserts);
-        }
-      }
-    }
-
-    if (shouldRevalidate) {
-      try {
-        revalidatePath("/admin/cars");
-        revalidatePath("/cars");
-      } catch (err) {
-        // Silently skip if revalidatePath is called during render
-      }
-    }
-
-    return { success: true, message: "تم توليد البيانات التجريبية للسيارات بنجاح!" };
-  } catch (err: any) {
-    console.error("Seed Cars error:", err);
-    return { success: false, error: err?.message || "فشل توليد البيانات التجريبية" };
   }
 }
 

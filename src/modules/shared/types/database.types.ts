@@ -210,13 +210,15 @@ export interface Database {
           title: string
           slug: string
           brand_id: string
-          model_id: string
+          model_id: string | null
+          origin?: string | null
+          trim_level?: string | null
           year: number
           price: number
           condition: CarCondition
           transmission: TransmissionType
           fuel_type: FuelType
-          drive_type: DriveType
+          drive_type: DriveType | null
           body_type: BodyType
           mileage: number
           engine_capacity: number | null
@@ -233,13 +235,15 @@ export interface Database {
           title: string
           slug: string
           brand_id: string
-          model_id: string
+          model_id?: string | null
+          origin?: string | null
+          trim_level?: string | null
           year: number
           price: number
           condition?: CarCondition
           transmission?: TransmissionType
           fuel_type?: FuelType
-          drive_type?: DriveType
+          drive_type?: DriveType | null
           body_type?: BodyType
           mileage?: number
           engine_capacity?: number | null
@@ -256,13 +260,15 @@ export interface Database {
           title?: string
           slug?: string
           brand_id?: string
-          model_id?: string
+          model_id?: string | null
+          origin?: string | null
+          trim_level?: string | null
           year?: number
           price?: number
           condition?: CarCondition
           transmission?: TransmissionType
           fuel_type?: FuelType
-          drive_type?: DriveType
+          drive_type?: DriveType | null
           body_type?: BodyType
           mileage?: number
           engine_capacity?: number | null

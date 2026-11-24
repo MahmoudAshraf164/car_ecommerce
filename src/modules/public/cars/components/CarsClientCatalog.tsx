@@ -526,15 +526,22 @@ export function CarsClientCatalog({
 
                     {/* Content */}
                     <div className="p-4">
-                      {/* Brand / Model row */}
-                      <div className="flex items-center gap-2 mb-1">
+                      {/* Brand / Origin / Trim row */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                         {brandName && (
                           <span className="text-[10px] font-black text-[#c5a059] bg-[#c5a059]/10 px-2 py-0.5 rounded border border-[#c5a059]/20">
                             {brandName}
                           </span>
                         )}
-                        {modelName && (
-                          <span className="text-[10px] text-[#76777b] font-bold">{modelName}</span>
+                        {(car as any).origin && (
+                          <span className="text-[10px] text-[#76777b] bg-slate-100 px-2 py-0.5 rounded font-bold border border-slate-200">
+                            {(car as any).origin}
+                          </span>
+                        )}
+                        {(car as any).trim_level && (
+                          <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-bold border border-amber-200/60">
+                            {(car as any).trim_level}
+                          </span>
                         )}
                       </div>
 

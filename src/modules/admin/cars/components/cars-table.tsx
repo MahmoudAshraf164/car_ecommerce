@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { CarWithRelations, BrandRow } from "../types/car.types";
 import { softDeleteCar, toggleFeatured } from "../actions/cars";
-import { SeedDataButton } from "./seed-data-button";
 import { AdminPagination } from "@/modules/admin/components/AdminPagination";
 import {
   Search, Plus, Star, Edit, Trash2, Eye, Filter,
@@ -99,7 +98,6 @@ export function CarsTable({ cars, brands, total, page, pageSize = 10, totalPages
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <SeedDataButton />
           <Link
             href="/admin/cars/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#121316] hover:bg-[#1b1b1f] text-white font-bold text-sm transition-all shadow-sm"
@@ -152,7 +150,8 @@ export function CarsTable({ cars, brands, total, page, pageSize = 10, totalPages
             <thead className="bg-[#F8F9FA] border-b border-[#E5E7EB]">
               <tr>
                 <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">السيارة</th>
-                <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">الماركة / الموديل</th>
+                <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">الماركة / الصناعة</th>
+                <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">الفئة</th>
                 <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">السنة</th>
                 <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">السعر</th>
                 <th className="px-5 py-3.5 text-xs font-black text-[#46464b] uppercase tracking-wider">الحالة</th>
@@ -163,9 +162,17 @@ export function CarsTable({ cars, brands, total, page, pageSize = 10, totalPages
             <tbody className="divide-y divide-[#F3F4F5]">
               {cars.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-[#76777b]">
-                    <CarIcon className="w-10 h-10 mx-auto mb-3 text-[#E1E3E4]" />
-                    لا توجد سيارات مطابقة للبحث
+                  <td colSpan={8} className="text-center py-16 text-[#76777b]">
+                    <CarIcon className="w-12 h-12 mx-auto mb-3 text-[#E1E3E4]" />
+                    <p className="font-bold text-slate-800 text-sm mb-1">لا توجد سيارات مضافة حالياً</p>
+                    <p className="text-xs text-slate-400 mb-4">لم يتم العثور على سيارات مطابقة أو لم يتم إضافة سيارات بعد.</p>
+                    <Link
+                      href="/admin/cars/new"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#c5a059] hover:bg-[#b08820] text-slate-950 font-bold text-xs transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      إضافة سيارة جديدة
+                    </Link>
                   </td>
                 </tr>
               ) : (
@@ -196,8 +203,17 @@ export function CarsTable({ cars, brands, total, page, pageSize = 10, totalPages
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-sm text-[#46464b]">
-                        {car.brand?.name || "—"}<br />
-                        <span className="text-xs text-[#76777b]">{car.car_models?.name || "—"}</span>
+                        <span className="font-bold text-[#121316]">{car.brand?.name || "—"}</span><br />
+                        <span className="text-xs text-[#76777b]">{(car as any).origin || "—"}</span>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs font-semibold text-slate-700">
+                        {(car as any).trim_level ? (
+                          <span className="bg-amber-50 text-amber-800 border border-amber-200/60 px-2 py-0.5 rounded-md font-bold">
+                            {(car as any).trim_level}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-5 py-3.5 text-sm font-mono font-bold text-[#121316]">{car.year}</td>
                       <td className="px-5 py-3.5 font-mono font-black text-[#121316]">

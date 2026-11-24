@@ -3,7 +3,7 @@ import { getBrandsAndModels } from "@/modules/admin/cars/actions/cars";
 import { BrandsManagementClient } from "@/modules/admin/brands/components/BrandsManagementClient";
 
 export const metadata = {
-  title: "إدارة الماركات والموديلات | لوحة التحكم",
+  title: "إدارة الماركات | لوحة التحكم",
 };
 
 export default async function BrandsManagementPage() {

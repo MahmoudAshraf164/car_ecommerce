@@ -12,12 +12,16 @@ export interface CarWithRelations extends CarRow {
   car_models?: CarModelRow | null;
   car_images?: CarImageRow[];
   features?: FeatureRow[];
+  origin?: string | null;
+  trim_level?: string | null;
 }
 
 export interface CarFilterParams {
   search?: string;
   brand_id?: string;
   model_id?: string;
+  origin?: string;
+  trim_level?: string;
   condition?: Enums<"car_condition">;
   transmission?: Enums<"transmission_type">;
   fuel_type?: Enums<"fuel_type">;

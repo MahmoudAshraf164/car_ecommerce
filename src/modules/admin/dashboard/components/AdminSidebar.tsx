@@ -63,7 +63,7 @@ export function AdminSidebar({
     },
     {
       href: "/admin/brands",
-      label: "الماركات والموديلات",
+      label: "الماركات",
       icon: Tags,
       badge: formatCount(counts?.brands),
     },

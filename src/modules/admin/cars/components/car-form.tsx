@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createBrowserClient } from "@supabase/ssr";
 import { carFormSchema, CarFormValues } from "../validations/car.schema";
 import { CarWithRelations, FeatureRow, CarImageRow } from "../types/car.types";
-import { createCar, getBrands, getModelsByBrand, seedCarsData } from "../actions/cars";
-import { CarBrandModelSelect } from "./CarBrandModelSelect";
+import { createCar, getBrands } from "../actions/cars";
 import { CarImageUploader, NewFileItem } from "./CarImageUploader";
 import { 
   Car, 
@@ -27,12 +27,9 @@ interface CarFormProps {
 export function CarForm({ initialCar, brands: initialBrands = [], featuresList = [] }: CarFormProps) {
   const router = useRouter();
   const [brandsList, setBrandsList] = useState<any[]>(initialBrands);
-  const [modelsList, setModelsList] = useState<any[]>([]);
   const [isLoadingBrands, setIsLoadingBrands] = useState(false);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ─── Image State Management ─────────────────────────────────────────────────
@@ -61,6 +58,8 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     slug: initialCar?.slug || "",
     brand_id: initialCar?.brand_id || (initialCar?.brand?.name || ""),
     model_id: initialCar?.model_id || (initialCar?.car_models?.name || ""),
+    origin: (initialCar as any)?.origin || "",
+    trim_level: (initialCar as any)?.trim_level || "",
     year: initialCar?.year || new Date().getFullYear(),
     price: initialCar?.price || 0,
     condition: (initialCar?.condition as any) || "used",
@@ -102,37 +101,6 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     }
     loadInitialBrands();
   }, [brandsList.length]);
-
-  // Load models whenever selectedBrandId changes
-  useEffect(() => {
-    async function fetchModels() {
-      if (!selectedBrandId || selectedBrandId.trim() === "") {
-        setModelsList([]);
-        return;
-      }
-      setIsLoadingModels(true);
-
-      const matchedBrand = brandsList.find(
-        (b) => b.id === selectedBrandId || b.name?.toLowerCase() === selectedBrandId?.toLowerCase()
-      );
-
-      if (matchedBrand) {
-        if (matchedBrand.car_models && matchedBrand.car_models.length > 0) {
-          setModelsList(matchedBrand.car_models);
-          setIsLoadingModels(false);
-          return;
-        }
-        const { data } = await getModelsByBrand(matchedBrand.id);
-        setModelsList(data || []);
-      } else {
-        const { data } = await getModelsByBrand(selectedBrandId);
-        setModelsList(data || []);
-      }
-      setIsLoadingModels(false);
-    }
-
-    fetchModels();
-  }, [selectedBrandId, brandsList]);
 
   // Clean up object URLs on unmount
   useEffect(() => {
@@ -208,22 +176,10 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
     }
   };
 
-  const handleSeedData = async () => {
-    setIsSeeding(true);
-    await seedCarsData(false);
-    const { data } = await getBrands();
-    if (data) setBrandsList(data);
-    setIsSeeding(false);
-  };
-
   // ─── Submit Handler ──────────────────────────────────────────────────────────
   const onSubmit = async (data: CarFormValues) => {
     if (!data.brand_id || data.brand_id.trim() === "") {
       setErrorMsg("يرجى اختيار الماركة أولاً");
-      return;
-    }
-    if (!data.model_id || data.model_id.trim() === "") {
-      setErrorMsg("يرجى اختيار الموديل التابع للماركة");
       return;
     }
 
@@ -244,13 +200,15 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
           title: data.title,
           slug: data.slug && data.slug.trim() !== "" ? data.slug : undefined,
           brand_id: data.brand_id,
-          model_id: data.model_id,
+          model_id: data.model_id || null,
+          origin: data.origin || null,
+          trim_level: data.trim_level || null,
           year: Number(data.year),
           price: Number(data.price),
           condition: data.condition,
           transmission: data.transmission,
           fuel_type: data.fuel_type,
-          drive_type: data.drive_type,
+          drive_type: data.drive_type || null,
           body_type: data.body_type,
           mileage: Number(data.mileage),
           engine_capacity: data.engine_capacity ? Number(data.engine_capacity) : null,
@@ -485,19 +443,17 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
 
       {/* No Brands Empty State Banner */}
       {brandsList.length === 0 && !isLoadingBrands && (
-        <div className="p-4 rounded-xl bg-[#C59B27]/10 border border-[#C59B27]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-900 text-sm">
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-slate-900 text-sm">
           <div className="flex items-center gap-2.5">
-            <AlertCircle className="w-5 h-5 text-[#C59B27] shrink-0" />
-            <span>لا توجد ماركات مسجلة في قاعدة البيانات حالياً. يمكنك توليد الماركات الأساسية بضغطة زر.</span>
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <span>لا توجد ماركات مسجلة في قاعدة البيانات حالياً. يرجى إضافة ماركة أولاً من قسم الماركات.</span>
           </div>
-          <button
-            type="button"
-            onClick={handleSeedData}
-            disabled={isSeeding}
-            className="px-4 py-2 bg-[#C59B27] text-slate-950 font-bold text-xs rounded-lg hover:bg-[#b08820] transition-colors shrink-0 disabled:opacity-50"
+          <Link
+            href="/admin/brands"
+            className="px-4 py-2 bg-amber-600 text-white font-bold text-xs rounded-lg hover:bg-amber-700 transition-colors shrink-0 text-center"
           >
-            {isSeeding ? "جاري التوليد..." : "توليد ماركات وموديلات افتراضية"}
-          </button>
+            الانتقال لإدارة الماركات
+          </Link>
         </div>
       )}
 
@@ -524,7 +480,7 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
                 {/* Title */}
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-700">
-                    عنوان الإعلان <span className="text-rose-500">*</span>
+                    اسم السيارة <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -537,19 +493,41 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
                   )}
                 </div>
 
-                {/* Brand & Model Select */}
-                <CarBrandModelSelect
-                  initialBrands={brandsList}
-                  selectedBrandId={selectedBrandId}
-                  selectedModelId={watch("model_id")}
-                  onBrandChange={(val: string) => {
-                    setValue("brand_id", val, { shouldValidate: true });
-                    setValue("model_id", "", { shouldValidate: true });
-                  }}
-                  onModelChange={(val: string) => setValue("model_id", val, { shouldValidate: true })}
-                  brandError={errors.brand_id?.message}
-                  modelError={errors.model_id?.message}
-                />
+                {/* Brand Select */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    الماركة <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    {...register("brand_id")}
+                    value={watch("brand_id")}
+                    onChange={(e) => setValue("brand_id", e.target.value, { shouldValidate: true })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
+                  >
+                    <option value="">-- اختر الماركة --</option>
+                    {brandsList.map((brand) => (
+                      <option key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.brand_id && (
+                    <p className="text-rose-500 text-xs font-medium">{errors.brand_id.message}</p>
+                  )}
+                </div>
+
+                {/* Origin ("الصناعة") Manual Text Input */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    الصناعة
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: ألماني، ياباني، كوري، صيني، أمريكي..."
+                    {...register("origin")}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
+                  />
+                </div>
 
                 {/* Year */}
                 <div className="space-y-1.5">
@@ -633,18 +611,41 @@ export function CarForm({ initialCar, brands: initialBrands = [], featuresList =
                   </select>
                 </div>
 
-                {/* Drive Type */}
+                {/* Trim Level ("الفئة") */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">نظام الدفع</label>
-                  <select
-                    {...register("drive_type")}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
-                  >
-                    <option value="fwd">جر أمامي (FWD)</option>
-                    <option value="rwd">دفع خلفي (RWD)</option>
-                    <option value="awd">دفع كلي مستمر (AWD)</option>
-                    <option value="4wd">دفع رباعي (4WD / 4x4)</option>
-                  </select>
+                  <label className="block text-xs font-bold text-slate-700">الفئة (Trim Level)</label>
+                  <div className="space-y-1.5">
+                    <select
+                      value={
+                        ["الفئة الأولى", "الفئة الثانية", "الفئة الثالثة", "الفئة الرابعة", "الفئة الخامسة", "أعلى فئة (Top Line)"].includes(watch("trim_level") || "")
+                          ? watch("trim_level") || ""
+                          : (watch("trim_level") ? "custom" : "")
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val !== "custom") {
+                          setValue("trim_level", val, { shouldValidate: true });
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C59B27]/20 focus:border-[#C59B27] transition-all"
+                    >
+                      <option value="">-- اختر الفئة أو حدد يدوي --</option>
+                      <option value="الفئة الأولى">الفئة الأولى</option>
+                      <option value="الفئة الثانية">الفئة الثانية</option>
+                      <option value="الفئة الثالثة">الفئة الثالثة</option>
+                      <option value="الفئة الرابعة">الفئة الرابعة</option>
+                      <option value="الفئة الخامسة">الفئة الخامسة</option>
+                      <option value="أعلى فئة (Top Line)">أعلى فئة (Top Line)</option>
+                      <option value="custom">فئة مخصصة / كتابة يدوية...</option>
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="أو اكتب اسم الفئة مباشرة (مثال: Luxury, Sport, Highline...)"
+                      {...register("trim_level")}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#C59B27]"
+                    />
+                  </div>
                 </div>
 
                 {/* Body Type */}

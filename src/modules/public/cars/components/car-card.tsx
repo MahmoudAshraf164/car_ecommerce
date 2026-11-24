@@ -105,11 +105,21 @@ export function CarCard({ car }: CarCardProps) {
           <h3 className="text-base font-black text-[#121316] mt-0.5 line-clamp-1 group-hover:text-[#c5a059] transition-colors">
             {car.title}
           </h3>
-          {car.car_models?.name && (
-            <span className="text-xs text-[#76777b] font-medium">
-              {car.car_models.name}
-            </span>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            {(car as any).origin && (
+              <span className="text-xs text-[#76777b] font-medium">
+                {(car as any).origin}
+              </span>
+            )}
+            {(car as any).origin && (car as any).trim_level && (
+              <span className="text-[#C7C6CB]">•</span>
+            )}
+            {(car as any).trim_level && (
+              <span className="text-xs text-[#c5a059] font-bold">
+                {(car as any).trim_level}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Specs Row */}
